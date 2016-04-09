@@ -1,0 +1,66 @@
+#ifndef IFACEPRIME_API_H
+#define IFACEPRIME_API_H
+
+#include "prime_api_defs_host.h"
+
+#define NUM_ELEMENTS_POINTER_TABLE      20
+
+typedef struct
+{
+    uint8_t valid;          // Protocol Type
+    uint8_t *puc_data;		// Ptr to data buffer
+    uint16_t con_handle;	// Length of data
+} cl_null_data_pointer;
+
+typedef struct
+{
+	prime_cl_null_establish_ind_cb_t prime_cl_null_establish_ind_cb;
+	prime_cl_null_establish_cfm_cb_t prime_cl_null_establish_cfm_cb;
+	prime_cl_null_release_ind_cb_t prime_cl_null_release_ind_cb;
+	prime_cl_null_release_cfm_cb_t prime_cl_null_release_cfm_cb;
+	prime_cl_null_join_ind_cb_t prime_cl_null_join_ind_cb;
+	prime_cl_null_join_cfm_cb_t prime_cl_null_join_cfm_cb;
+	prime_cl_null_leave_cfm_cb_t prime_cl_null_leave_cfm_cb;
+	prime_cl_null_leave_ind_cb_t prime_cl_null_leave_ind_cb;
+	prime_cl_null_data_cfm_cb_t prime_cl_null_data_cfm_cb;
+	prime_cl_null_data_ind_cb_t prime_cl_null_data_ind_cb;
+	prime_cl_null_plme_reset_cfm_cb_t prime_cl_null_plme_reset_cfm_cb;
+	prime_cl_null_plme_sleep_cfm_cb_t prime_cl_null_plme_sleep_cfm_cb;
+	prime_cl_null_plme_resume_cfm_cb_t prime_cl_null_plme_resume_cfm_cb;
+	prime_cl_null_plme_testmode_cfm_cb_t prime_cl_null_plme_testmode_cfm_cb;
+	prime_cl_null_plme_get_cfm_cb_t prime_cl_null_plme_get_cfm_cb;
+	prime_cl_null_plme_set_cfm_cb_t prime_cl_null_plme_set_cfm_cb;
+	prime_cl_null_mlme_register_cfm_cb_t prime_cl_null_mlme_register_cfm_cb;
+	prime_cl_null_mlme_register_ind_cb_t prime_cl_null_mlme_register_ind_cb;
+	prime_cl_null_mlme_unregister_cfm_cb_t prime_cl_null_mlme_unregister_cfm_cb;
+	prime_cl_null_mlme_unregister_ind_cb_t prime_cl_null_mlme_unregister_ind_cb;
+	prime_cl_null_mlme_promote_cfm_cb_t prime_cl_null_mlme_promote_cfm_cb;
+	prime_cl_null_mlme_promote_ind_cb_t prime_cl_null_mlme_promote_ind_cb;
+	prime_cl_null_mlme_demote_cfm_cb_t prime_cl_null_mlme_demote_cfm_cb;
+	prime_cl_null_mlme_demote_ind_cb_t prime_cl_null_mlme_demote_ind_cb;
+	prime_cl_null_mlme_reset_cfm_cb_t prime_cl_null_mlme_reset_cfm_cb;
+	prime_cl_null_mlme_get_cfm_cb_t prime_cl_null_mlme_get_cfm_cb;
+	prime_cl_null_mlme_list_get_cfm_cb_t prime_cl_null_mlme_list_get_cfm_cb;
+	prime_cl_null_mlme_set_cfm_cb_t prime_cl_null_mlme_set_cfm_cb;
+	prime_cl_432_establish_cfm_cb_t prime_cl_432_establish_cfm_cb;
+	prime_cl_432_release_cfm_cb_t prime_cl_432_release_cfm_cb;
+	prime_cl_432_dl_data_cfm_cb_t prime_cl_432_dl_data_cfm_cb;
+	prime_cl_432_dl_data_ind_cb_t prime_cl_432_dl_data_ind_cb;
+	prime_cl_432_dl_leave_ind_cb_t prime_cl_432_dl_leave_ind_cb;
+	prime_cl_432_dl_join_ind_cb_t prime_cl_432_dl_join_ind_cb;
+	bmng_fup_ack_ind_cb_t bmng_fup_ack_ind_cb;
+	bmng_fup_status_ind_cb_t bmng_fup_status_ind_cb;
+	bmng_fup_error_ind_cb_t bmng_fup_error_ind_cb;
+	bmng_fup_version_ind_cb_t bmng_fup_version_ind_cb;
+	bmng_fup_kill_ind_cb_t bmng_fup_kill_ind_cb;
+	bmng_network_event_ind_cb_t bmng_network_event_ind_cb;
+	bmng_pprof_get_response_cb_t bmng_pprof_get_response_cb;
+	bmng_pprof_get_enhanced_response_cb_t bmng_pprof_get_enhanced_response_cb;
+	bmng_pprof_ack_ind_cb_t bmng_pprof_ack_ind_cb;
+} prime_api_cbs_t;
+
+void ifacePrime_api_init();
+void ifacePrime_select_api(uint8_t prime_app_id);
+//void ifacePrime_api_redirect(int _fd);
+
+#endif // IFACEPRIME_API_H
