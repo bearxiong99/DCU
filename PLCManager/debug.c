@@ -1,31 +1,50 @@
 #include "debug.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <fcntl.h>
+#include <time.h>
+#include <unistd.h>
 
-//#include "dlmsotcp.h"
+#ifdef DEBUG_ENABLE
+static char spuc_dbg_name[50];
+static char spuc_dbg_buf[500];
+static int si_log_fd;
 
-//extern td_x_args g_x_args;
+void PRINTF_INIT(void) {
+	int i_ln_len;
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
 
-void PRINTF(int level, const char * format, ...)
-{
-/*	char szStr[500];
-
-	if ((g_x_args.i_verbose!= 0) && (level <= g_x_args.i_verbose_level))
-	{
-		va_list argptr;
-		va_start(argptr,format);
-		vsprintf(szStr, format, argptr);
-		fprintf(stderr,"%s", szStr);
-		va_end(argptr);
+	i_ln_len = sprintf(spuc_dbg_name, "/tmp/PLC_Dbg_%u%02u%02u_%02u%02u%02u.log",
+			(tm->tm_year + 1900), tm->tm_mon, tm->tm_mday,tm->tm_hour, tm->tm_min, tm->tm_sec);
+	si_log_fd = open(spuc_dbg_name, O_RDWR|O_CREAT|O_APPEND, S_IROTH|S_IWOTH|S_IXOTH);
+	if (i_ln_len > 0) {
+		i_ln_len = sprintf(spuc_dbg_buf, "Start DCU debugging...\r\n");
+		write(si_log_fd, spuc_dbg_buf, i_ln_len);
 	}
-	if(level == PRINT_ERROR)
-	{
 
-		va_list argptr;
-		va_start(argptr,format);
-		vsprintf(szStr, format, argptr);
-		//fprintf(stderr,"%s", szStr);
-		va_end(argptr);
-		syslog(LOG_ERR, "%s", szStr);
-	}*/
 }
+
+void PRINTF(const char * format, ...) {
+	int i_ln_len;
+
+	va_list argptr;
+	va_start(argptr,format);
+	i_ln_len = vsprintf(spuc_dbg_buf, format, argptr);
+	va_end(argptr);
+
+	if (i_ln_len > 0) {
+		write(si_log_fd, spuc_dbg_buf, i_ln_len);
+	}
+}
+
+#else
+void PRINTF_INIT(void) {
+
+}
+
+void PRINTF(const char * format, ...) {
+
+}
+
+#endif

@@ -16,6 +16,8 @@
 #include "dlms_emu.h"
 #include "dlms_emu_report.h"
 
+#include "debug.h"
+
 /* Configure Number of steps and lengths */
 #define NUM_STEPS                          5
 
@@ -42,7 +44,7 @@ typedef enum {
 	ASSOCIATION_REQUEST,
 	DATE_REQUEST,
 	SO2_REQUEST,
-	NEXBLOCK_REQUEST,
+	NEXTBLOCK_REQUEST,
 	RELEASE_REQUEST
 } dlms_status_tag_t;
 
@@ -64,13 +66,13 @@ static dl_432_buffer_t sx_cmd_tx_432;
 static int si_dlms_emu_app_id;
 
 static timer_t st_timeout_timer;
-static timer_t st_next_cycles_timer;
+static timer_t st_next_cycle_timer;
 static timer_t st_next_node_timer;
 static timer_t st_next_step_timer;
 
 static void _cycle_next_node(void);
 static void _next_step(void);
-static void _start_cycles(void);
+static void _start_cycle(void);
 static void _timeout(void);
 static uint16_t _get_next_node_to_cycle(uint16_t us_index);
 static uint16_t _get_number_nodes_connected(void);
@@ -132,33 +134,30 @@ static void _timer_handler(int sig, siginfo_t *si, void *puc_data)
     timer_t *tidp;
     tidp = si->si_value.sival_ptr;
 
-    //printf("_timer_handler: ");
-
     if (*tidp == st_timeout_timer) {
-    	//printf("timeout call\r\n");
+    	PRINTF("DLMS EMU: _timer_handler _timeout\n");
         _timeout();
-    } else if (*tidp == st_next_cycles_timer) {
-    	//printf("start_cycles call\r\n");
-        _start_cycles();
+    } else if (*tidp == st_next_cycle_timer) {
+    	PRINTF("DLMS EMU: _timer_handler _start_cycle\n");
+        _start_cycle();
     } else if (*tidp == st_next_node_timer) {
-    	//printf("cycle_next_node call\r\n");
+    	PRINTF("DLMS EMU: _timer_handler _cycle_next_node\n");
         _cycle_next_node();
     } else if (*tidp == st_next_step_timer) {
-    	//printf("next_step call\r\n");
+    	PRINTF("DLMS EMU: _timer_handler _next_step\n");
         _next_step();
+    } else {
+    	PRINTF("DLMS EMU: _timer_handler UNKNOWN\n");
     }
 
 }
 
-static int _start_timer_sec(char *name, timer_t *timer_id, int expire_sec, int interval_sec)
+static int _create_local_timer(char *name, timer_t *timer_id)
 {
     struct sigevent         te;
-    struct itimerspec       its;
     struct sigaction        sa;
     int                     sigNo = SIGRTMIN;
     int res;
-
-    //printf("_start_timer_sec: %s\r\n", name);
 
     /* Set up signal handler. */
     sa.sa_flags = SA_SIGINFO;
@@ -178,6 +177,15 @@ static int _start_timer_sec(char *name, timer_t *timer_id, int expire_sec, int i
     	printf("_error_timer_create: %s\r\n", name);
 		return(-1);
 	}
+
+    return(0);
+}
+
+
+static int _start_timer_sec(char *name, timer_t *timer_id, int expire_sec, int interval_sec)
+{
+    struct itimerspec       its;
+    int res;
 
     its.it_interval.tv_sec = interval_sec;
     its.it_interval.tv_nsec = 0;
@@ -194,32 +202,8 @@ static int _start_timer_sec(char *name, timer_t *timer_id, int expire_sec, int i
 
 static int _start_timer_ms(char *name, timer_t *timer_id, int expire_ms, int interval_ms)
 {
-    struct sigevent         te;
     struct itimerspec       its;
-    struct sigaction        sa;
-    int                     sigNo = SIGRTMIN;
     int res;
-
-    /* Set up signal handler. */
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = _timer_handler;
-    sigemptyset(&sa.sa_mask);
-    if (sigaction(sigNo, &sa, NULL) == -1) {
-        fprintf(stderr, "Failed to setup signal handling for %s.\n", name);
-        return(-1);
-    }
-
-    /* Set and enable alarm */
-    te.sigev_notify = SIGEV_SIGNAL;
-    te.sigev_signo = sigNo;
-    te.sigev_value.sival_ptr = timer_id;
-    res = timer_create(CLOCK_REALTIME, &te, timer_id);
-    if (res == -1) {
-    	printf("_error_timer_create: %s\r\n", name);
-		return(-1);
-	}
-
-    //printf("_start_timer_ms: %s\r\n", name);
 
     its.it_interval.tv_sec = 0;
     its.it_interval.tv_nsec = interval_ms * 1000000;
@@ -234,7 +218,7 @@ static int _start_timer_ms(char *name, timer_t *timer_id, int expire_ms, int int
     return(0);
 }
 
-static int _stop_timer(timer_t *timer_id)
+static int _stop_timer(char *name, timer_t *timer_id)
 {
 	struct itimerspec its;
     int res;
@@ -246,7 +230,7 @@ static int _stop_timer(timer_t *timer_id)
 		its.it_value.tv_nsec = 0;
 		res = timer_settime(*timer_id, 0, &its, NULL);
 		if (res == -1) {
-			printf("_error_timer_settime\r\n");
+			printf("_error_stop_timer: %s\r\n", name);
 			return(-1);
 		}
 	}
@@ -271,12 +255,14 @@ static uint16_t _generate_str(dlms_status_tag_t uc_step, uint8_t uc_invoke_order
 	case ASSOCIATION_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_associationRequest);
 		puc_dlms_message = cmd_DLMS_associationRequest;
+		PRINTF("DLMS EMU: Send ASSOCIATION_REQUEST\n");
 		break;
 
 	case DATE_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_date_OBIS0000010000FF_0008_02);
 		puc_dlms_message = cmd_DLMS_date_OBIS0000010000FF_0008_02;
 		cmd_DLMS_date_OBIS0000010000FF_0008_02[2] = uc_invoke_order;
+		PRINTF("DLMS EMU: Send DATE_REQUEST\n");
 		break;
 
 	case SO2_REQUEST:
@@ -284,19 +270,22 @@ static uint16_t _generate_str(dlms_status_tag_t uc_step, uint8_t uc_invoke_order
 		puc_dlms_message = cmd_DLMS_S02_OBIS0100630100FF_0007_02;
 		cmd_DLMS_S02_OBIS0100630100FF_0007_02[2] = uc_invoke_order + 1;
 		suc_blocknumber = 1;
+		PRINTF("DLMS EMU: Send SO2_REQUEST\n");
 		break;
 
-	case NEXBLOCK_REQUEST:
+	case NEXTBLOCK_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_NextBlock);
 		puc_dlms_message = cmd_DLMS_NextBlock;
 		cmd_DLMS_NextBlock[2] = uc_invoke_order + 1;
 		suc_blocknumber++;
 		cmd_DLMS_NextBlock[6] = suc_blocknumber;
+		PRINTF("DLMS EMU: Send NEXTBLOCK_REQUEST\n");
 		break;
 
 	case RELEASE_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_release_request);
 		puc_dlms_message = cmd_DLMS_release_request;
+		PRINTF("DLMS EMU: Send RELEASE_REQUEST\n");
 		break;
 	}
 
@@ -320,7 +309,7 @@ static void _timeout(void)
  * \brief Start dlms cycles form node 0
  *
  */
-static void _start_cycles(void)
+static void _start_cycle(void)
 {
 	/* Look for the first node with 432 connection open */
 	if (_get_number_nodes_connected() != 0) {
@@ -330,7 +319,6 @@ static void _start_cycles(void)
 			dlms_emu_report_start_cycle();
 			suc_current_node_dlms_step = ASSOCIATION_REQUEST;
 
-			//printf("_start_cycle %u \r\n", sul_total_cycle_number);
 			_st_machine(sus_current_node, suc_current_node_dlms_step, CMD_SEND);
 		}
 	}
@@ -343,10 +331,10 @@ static void _start_cycles(void)
 static void _stop_cycles(void)
 {
 	/* Cancel all timers */
-	_stop_timer(&st_timeout_timer);
-	_stop_timer(&st_next_cycles_timer);
-	_stop_timer(&st_next_node_timer);
-	_stop_timer(&st_next_step_timer);
+	_stop_timer("timeout", &st_timeout_timer);
+	_stop_timer("next cycle", &st_next_cycle_timer);
+	_stop_timer("next node", &st_next_node_timer);
+	_stop_timer("next step", &st_next_step_timer);
 
 	sul_total_cycle_number = 0;
 	suc_current_node_dlms_step = ASSOCIATION_REQUEST;
@@ -369,7 +357,7 @@ static void _cycle_next_node(void)
 	} else {
 		/* end of cycles..  start next cycle from beginning */
 		dlms_emu_report_end_cycle();
-		_start_timer_sec("next cycles", &st_next_cycles_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
+		_start_timer_sec("next cycle", &st_next_cycle_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
 	}
 }
 
@@ -400,12 +388,12 @@ static void _next_step(void)
 		break;
 
 	case SO2_REQUEST:
-		suc_current_node_dlms_step = NEXBLOCK_REQUEST;
+		suc_current_node_dlms_step = NEXTBLOCK_REQUEST;
 		suc_blocknumber = 0;
 		_st_machine(sus_current_node, suc_current_node_dlms_step, CMD_SEND);
 		break;
 
-	case NEXBLOCK_REQUEST:
+	case NEXTBLOCK_REQUEST:
 		suc_blocknumber++;
 		if (suc_blocknumber > DLMS_SO2_NUMBER_OF_BLOCKS) {
 			suc_current_node_dlms_step = RELEASE_REQUEST;
@@ -424,10 +412,8 @@ static void _next_step(void)
 		} else {
 			/* end of cycles..  start next cycle from beginning */
 			dlms_emu_report_end_cycle();
-			_start_timer_sec("next cycles", &st_next_cycles_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
+			_start_timer_sec("next cycle", &st_next_cycle_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
 		}
-
-		//_start_timer_sec("next node", &st_next_node_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
 		break;
 	}
 }
@@ -460,8 +446,11 @@ static void _st_machine(uint16_t us_index, dlms_status_tag_t dlms_status, cmd_cy
 		break;
 
 	case CMD_INDICATION:
-		_start_timer_ms("next_step", &st_next_step_timer, DLMS_EMU_TIME_WAIT_BETWEEN_MESSAGES, 0);
-		break;
+		if (dlms_status == RELEASE_REQUEST) {
+			_start_timer_ms("next_cycle", &st_next_cycle_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
+		} else {
+			_start_timer_ms("next_step", &st_next_step_timer, DLMS_EMU_TIME_WAIT_BETWEEN_MESSAGES, 0);
+		}break;
 
 	case CMD_TIMEOUT:
 		sx_node_report_info.i_element_id = suc_current_node_dlms_step;
@@ -593,7 +582,8 @@ void _dlms_mngp_rsp_cb(uint8_t* ptrMsg, uint16_t len)
 
 			if ((uc_records == 0) || (uc_records < MNGP_PRIME_ENHANCED_LIST_MAX_RECORDS)) {
 				/* End query */
-				_start_cycles();
+				PRINTF("DLMS EMU: Updated Connected Nodes Table\n");
+				_start_cycle();
 			} else {
 				uint16_t us_bigendian_iterator = 0;
 
@@ -684,7 +674,7 @@ static uint8_t _check_dlms_message(dlms_status_tag_t uc_step, uint8_t *puc_data)
 
 		break;
 
-	case NEXBLOCK_REQUEST:
+	case NEXTBLOCK_REQUEST:
 		if (memcmp((void *)puc_data, (void *)get_request_s02val, (int)2) == 0) {
 			uc_result = DLMS_VALID_MESSAGE;
 		} else {
@@ -697,17 +687,21 @@ static uint8_t _check_dlms_message(dlms_status_tag_t uc_step, uint8_t *puc_data)
 	case RELEASE_REQUEST:
 		if (memcmp((void *)puc_data, (void *)release_response_val, (int)5) == 0) {
 			uc_result = DLMS_VALID_MESSAGE;
+
 		} else {
 			/* invalid response received */
 			uc_result = DLMS_INVALID_MESSAGE;
 		}
 
 		break;
-
-	default:
-		uc_result = DLMS_INVALID_MESSAGE;
-		break;
 	}
+
+	if (uc_result == DLMS_INVALID_MESSAGE) {
+		PRINTF("DLMS EMU: RSP ERROR (%u)\n", uc_step);
+	} else {
+		PRINTF("DLMS EMU: RSP OK (%u)\n", uc_step);
+	}
+
 	return uc_result;
 }
 
@@ -731,7 +725,7 @@ uint16_t uc_lsdu_len, uint8_t uc_link_class)
 	(void)(us_dst_address);
 	(void)(src_address);
 
-	_stop_timer(&st_timeout_timer);
+	_stop_timer("timeout", &st_timeout_timer);
 
 	if (_check_dlms_message(suc_current_node_dlms_step, puc_data) == DLMS_VALID_MESSAGE) {
 		_st_machine(sus_current_node, suc_current_node_dlms_step, CMD_INDICATION);
@@ -766,6 +760,7 @@ static void _dlms_emu_cl_432_dl_data_cfm_cb(uint8_t uc_dst_lsap, uint8_t uc_src_
 
 	switch (uc_tx_status) {
 	case CL_432_TX_STATUS_SUCCESS:
+		PRINTF("DLMS EMU: TX CFM OK\n");
 		/* data confirm success */
 		_start_timer_sec("timeout", &st_timeout_timer, DLMS_EMU_TIME_WAIT_RESPONSE, 0);
 		break;
@@ -774,6 +769,7 @@ static void _dlms_emu_cl_432_dl_data_cfm_cb(uint8_t uc_dst_lsap, uint8_t uc_src_
 	case CL_432_TX_STATUS_TIMEOUT:
 	case CL_432_TX_STATUS_ERROR_BAD_ADDRESS:
 	case CL_432_TX_STATUS_ERROR_BAD_HANLDER:
+		PRINTF("DLMS EMU: TX CFM ERROR [%u]\n", uc_tx_status);
 		/* data confirm timeout or handler error */
 		sx_node_report_info.i_element_id = suc_current_node_dlms_step;
 		sprintf(&sx_node_report_info.pc_dev_sn[0],"%s", sx_list_nodes[sus_current_node].serial_number);
@@ -841,13 +837,14 @@ static void _dlms_emu_rcv_cmd(uint8_t* buf, uint16_t buflen)
     switch (*puc_buf++) {
 		case DLMS_EMU_CMD_START_CYCLES:
 		{
+			PRINTF("DLMS EMU: start cycles\n");
 			_update_nodes_list();
-			//_start_cycles();
 		}
     	break;
 
     case DLMS_EMU_CMD_STOP_CYCLES:
 		{
+			PRINTF("DLMS EMU: stop cycles\n");
 			_stop_cycles();
 		}
     	break;
@@ -886,6 +883,12 @@ void dlms_emu_init(int _app_id)
 	mngLay_SetRspCallback(_app_id, _dlms_mngp_rsp_cb);
 
 	dlms_emu_report_init();
+
+	/* Create local timers */
+	_create_local_timer("timeout", &st_timeout_timer);
+	_create_local_timer("next cycles", &st_next_cycle_timer);
+	_create_local_timer("next node", &st_next_node_timer);
+	_create_local_timer("next step", &st_next_step_timer);
 }
 
 

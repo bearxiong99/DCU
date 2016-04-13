@@ -22,6 +22,7 @@
 #include <stdbool.h>
 
 #include "debug.h"
+#include "errno.h"
 #include "socket_handler.h"
 
 /* Array to store Socket file descriptors */
@@ -102,6 +103,7 @@ bool socket_attach_connection(int _app_id, int _fd)
 					FD_SET(_fd, &sx_socket_listeners);
 					/* Update MAX num of listener index */
 					si_max_listener = (_fd > si_max_listener)? _fd: si_max_listener;
+//					PRINTF("Socket: socket_attach_connection(app_id[%u], socket[%u])\r\n", _app_id, _fd);
 					return true;
 					break;
 			}
@@ -121,6 +123,7 @@ void socket_dettach_connection(int _app_id, int _fd)
 					FD_CLR(_fd, &sx_socket_listeners);
 					/* Update MAX num of listener index */
 					si_max_listener = (_fd == si_max_listener)? (si_max_listener - 1): si_max_listener;
+					PRINTF("Socket: socket_dettach_connection(app_id[%u], socket[%u])\r\n", _app_id, _fd);
 					break;
 			}
 	}
@@ -134,20 +137,20 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 	struct sockaddr_in x_addr;
 
 	if (_app_id > SOCKET_MAX_NUM) {
-		PRINTF(PRINT_ERROR,"server socket() failed");
+		PRINTF("Socket: server socket() failed");
 		exit(-1);
 	}
 
 	i_listen_sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (i_listen_sd < 0) {
-		PRINTF(PRINT_ERROR,"server socket() failed");
+		PRINTF("Socket: server socket() failed");
 	    exit(-1);
 	}
 
 	/* Allow socket descriptor to be reuseable */
 	i_rc = setsockopt(i_listen_sd, SOL_SOCKET,  SO_REUSEADDR, &i_on, sizeof(i_on));
 	if (i_rc < 0) {
-		PRINTF(PRINT_ERROR,"setsockopt() failed");
+		PRINTF("Socket: setsockopt() failed");
 	    close(i_listen_sd);
 	    exit(-1);
 	}
@@ -159,15 +162,15 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 	x_addr.sin_port        = htons(_port);
 	i_rc = bind(i_listen_sd, (struct sockaddr *)&x_addr, sizeof(x_addr));
 	if (i_rc < 0) {
-		PRINTF(PRINT_ERROR,"bind() failed");
-	      close(i_listen_sd);
-	      exit(-1);
+		PRINTF("Socket: bind() failed");
+		close(i_listen_sd);
+		exit(-1);
 	}
 
 	/* Set the listen back log */
 	i_rc = listen(i_listen_sd, 1);
 	if (i_rc < 0) {
-		PRINTF(PRINT_ERROR,"listen() failed");
+		PRINTF("Socket: listen() failed");
 	    close(i_listen_sd);
 	    exit(-1);
 	}
@@ -180,6 +183,8 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 	/* Add to SOCKET listeners */
 	socket_append_listener(sx_sockets[_app_id].i_socket_fd);
 
+	PRINTF("Socket: create (app_id[%u], socket[%u])\r\n", _app_id, i_listen_sd);
+
 	return i_listen_sd;
 }
 
@@ -191,6 +196,10 @@ int socket_select(socket_ev_info_t *_event_info)
 
 	memcpy(&working_set, &sx_socket_listeners, sizeof(sx_socket_listeners));
 
+	/* Configure timeout for listen ports */
+	sx_timeout.tv_sec  = 0;
+	sx_timeout.tv_usec = 10000;  /* 10ms */
+
 	/* Wait on file descriptors for data available */
 	i_sel_ret = select(si_max_listener + 1, &working_set, NULL, NULL, &sx_timeout);
 
@@ -201,6 +210,7 @@ int socket_select(socket_ev_info_t *_event_info)
 
 	if (i_sel_ret < 0) {
 		/* Error */
+		PRINTF("Socket: SOCKET_ERROR errno(%u)\r\n", errno);
 		return SOCKET_ERROR;
 	}
 
@@ -215,6 +225,7 @@ int socket_select(socket_ev_info_t *_event_info)
 
 	if (i_fd_ready < 0) {
 		/* Error */
+		PRINTF("Socket: SOCKET is not setted in master set\r\n");
 		return SOCKET_ERROR;
 	}
 
@@ -225,6 +236,7 @@ int socket_select(socket_ev_info_t *_event_info)
 				_event_info->i_app_id = i;
 				_event_info->i_event_type = SOCKET_EV_LINK_TYPE;
 				_event_info->i_socket_fd = i_fd_ready;
+//				PRINTF("Socket: SOCKET_EV_LINK_TYPE(app_id[%u], socket[%u])\r\n", i, i_fd_ready);
 				return SOCKET_SUCCESS;
 		} else {
 			/* Check Connection Socket */
@@ -233,12 +245,14 @@ int socket_select(socket_ev_info_t *_event_info)
 					_event_info->i_app_id = i;
 					_event_info->i_socket_fd = i_fd_ready;
 					_event_info->i_event_type = SOCKET_EV_DATA_TYPE;
+//					PRINTF("Socket: SOCKET_EV_DATA_TYPE(app_id[%u], socket[%u])\r\n", i, i_fd_ready);
 					return SOCKET_SUCCESS;
 				}
 			}
 		}
 	}
 
+	PRINTF("Socket: SOCKET_GENERIC_ERROR\r\n");
 	return SOCKET_ERROR;
 }
 
@@ -252,7 +266,10 @@ void socket_accept_conn(socket_ev_info_t *_event_info)
 	setsockopt(_event_info->i_socket_fd, IPPROTO_TCP, TCP_NODELAY, (char *) &opt_flag, sizeof(opt_flag));
 
 	if (socket_attach_connection(_event_info->i_app_id, fd) == false) {
+		PRINTF("Socket: ERROR atttach conn(app_id[%u], socket[%u])\r\n", _event_info->i_app_id, fd);
 		close(fd);
+	} else {
+		PRINTF("Socket: atttach conn(app_id[%u], socket[%u])\r\n", _event_info->i_app_id, fd);
 	}
 }
 

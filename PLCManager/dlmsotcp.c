@@ -158,10 +158,10 @@ static void _send_queued_432_data()
 									&msg,
 									x_pending_cfm_messages_list.px_head->us_length,
 									0);
-	PRINTF(PRINT_INFO,"SEND QUEUED PACKET: cl_432 send: #%d, lsap %d, dest %d\n",
-					x_pending_cfm_messages_list.px_head->us_retries,
-					x_pending_cfm_messages_list.px_head->us_lsap,
-					x_pending_cfm_messages_list.px_head->us_dst);
+//	PRINTF(PRINT_INFO,"SEND QUEUED PACKET: cl_432 send: #%d, lsap %d, dest %d\n",
+//					x_pending_cfm_messages_list.px_head->us_retries,
+//					x_pending_cfm_messages_list.px_head->us_lsap,
+//					x_pending_cfm_messages_list.px_head->us_dst);
 }
 
 
@@ -237,7 +237,7 @@ void _dlmsotcp_cl_432_join_ind_cb(uint8_t *puc_device_id, uint8_t uc_device_id_l
 	uint8_t uc_length;
 	uint8_t puc_dlms_msg[512];
 
-	PRINTF(PRINT_INFO,"_dlmsotcp_cl_432_join_ind_cb\n");
+//	PRINTF(PRINT_INFO,"_dlmsotcp_cl_432_join_ind_cb\n");
 
 	/* Add node to list */
 	if (us_dst_address >= us_max_index_connected_node) {
@@ -304,7 +304,7 @@ void _dlmsotcp_cl_432_leave_ind_cb(uint16_t us_dst_address)
 	uint8_t uc_length;
 	uint8_t puc_dlms_msg[512];
 
-	PRINTF(PRINT_INFO,"_dlmsotcp_cl_432_leave_ind_cb\n");
+//	PRINTF(PRINT_INFO,"_dlmsotcp_cl_432_leave_ind_cb\n");
 	/* remove node from list */
 	x_list_nodes_connected[us_dst_address].dst_address = CL_432_INVALID_ADDRESS;
 	x_list_nodes_connected[us_dst_address].autoclose_enabled = FALSE;
@@ -411,7 +411,7 @@ void _dlmsotcp_cl_432_dl_data_ind_cb(uint8_t uc_dst_lsap, uint8_t uc_src_lsap, u
 	uint16_t us_length;
 	uint8_t puc_dlms_msg[MAX_LENGTH_432_DATA];
 
-	PRINTF(PRINT_INFO,"\n_dlmsotcp_cl_432_dl_data_ind_cb  SRC=%d, DEST=%d, LEN=%d\n", uc_src_lsap, us_dst_address, uc_lsdu_len);
+//	PRINTF(PRINT_INFO,"\n_dlmsotcp_cl_432_dl_data_ind_cb  SRC=%d, DEST=%d, LEN=%d\n", uc_src_lsap, us_dst_address, uc_lsdu_len);
 	
 	(void)(uc_dst_lsap);
 	(void)(uc_src_lsap);
@@ -643,11 +643,11 @@ void _dlmsotcp_mngp_rsp_cb(uint8_t* ptrMsg, uint16_t len)
 				memcpy(x_list_nodes_connected[us_address].mac,  puc_pib_value + 4 + SERIAL_NUMBER_432_MAC +1, 6);
 
 				/* Print node*/
-				PRINTF(PRINT_INFO,"Address %d, Serial: %s, EUI48: %02X:%02X:%02X:%02X:%02X:%02X\n",
-						us_address, x_list_nodes_connected[us_address].serial_number,
-						x_list_nodes_connected[us_address].mac[0],x_list_nodes_connected[us_address].mac[1],
-						x_list_nodes_connected[us_address].mac[2],x_list_nodes_connected[us_address].mac[3],
-						x_list_nodes_connected[us_address].mac[4],x_list_nodes_connected[us_address].mac[5]);
+//				PRINTF(PRINT_INFO,"Address %d, Serial: %s, EUI48: %02X:%02X:%02X:%02X:%02X:%02X\n",
+//						us_address, x_list_nodes_connected[us_address].serial_number,
+//						x_list_nodes_connected[us_address].mac[0],x_list_nodes_connected[us_address].mac[1],
+//						x_list_nodes_connected[us_address].mac[2],x_list_nodes_connected[us_address].mac[3],
+//						x_list_nodes_connected[us_address].mac[4],x_list_nodes_connected[us_address].mac[5]);
 
 				/* advance buffer pointer to record length plus iterator length */
 				puc_pib_value+= uc_record_len +2;
@@ -770,7 +770,7 @@ __dlmsMsg:
     pcDlmsBuf = buf + 8;
 
     if (usVersion != 0x1) {
-        PRINTF(PRINT_ERROR,"DLMSoTCP Bad version\n");
+        PRINTF("DLMSoTCP: DLMSoTCP Bad version\n");
         return;
     }
 
@@ -859,10 +859,10 @@ __dlmsMsg:
 
         } else {
         	_dlms_msg_put(&x_free_messages_list, px_msg);
-        	PRINTF(PRINT_ERROR," ERROR, No more free message buffers %d-%d!!!!!\n",
+        	PRINTF("DLMSoTCP:  ERROR, No more free message buffers %d-%d!!!!!\n",
         			x_free_messages_list.us_count,
         			x_pending_cfm_messages_list.us_count);
-        	PRINTF(PRINT_ERROR," Discard message. This should never happen!!!!!\n");
+        	PRINTF("DLMSoTCP:  Discard message. This should never happen!!!!!\n");
         }
 
         /* Check pending confirm queue for old messages...*/
@@ -876,7 +876,7 @@ __dlmsMsg:
         		px_msg =_dlms_msg_get(&x_pending_cfm_messages_list);
         		/* put it back in free  messages */
         		_dlms_msg_put(&x_free_messages_list, px_msg);
-        		PRINTF(PRINT_ERROR," ERROR, QUEUE CONFRIM TIMEOUT  Time= %d, Queued= %d!!!!!\n", ui_now - ui_timestamp, x_pending_cfm_messages_list.us_count);
+        		PRINTF("DLMSoTCP:  ERROR, QUEUE CONFRIM TIMEOUT  Time= %d, Queued= %d!!!!!\n", ui_now - ui_timestamp, x_pending_cfm_messages_list.us_count);
 
         		/* send next message */
         		_send_queued_432_data();

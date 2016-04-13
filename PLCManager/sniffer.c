@@ -10,6 +10,8 @@
 #include "usi_host.h"
 #include "hal_utils.h"
 
+#include "debug.h"
+
 /* Serial Port descriptor */
 static int si_serial_port_fd;
 static int si_sniffer_socket_fd;
@@ -37,6 +39,7 @@ static void _sniffer_data_rcv(uint8_t *msg, uint16_t len)
 				usi_cmd._fd = pi_conn_fds[idx];
 				/* send to USI through socket param */
 				usi_host_send_cmd(&usi_cmd);
+//				PRINTF("Sniffer: usi_host_send_cmd(socket[%u])\n", usi_cmd._fd);
 			}
 		}
 	}
@@ -71,8 +74,10 @@ void sniffer_callback(socket_ev_info_t *_ev_info)
 			/* Read data from Socket */
 			i_bytes = read(_ev_info->i_socket_fd, suc_sniffer_rcv_buf, MAX_SNIFFER_BUFFER_SIZE);
 			if (i_bytes > 0) {
+				PRINTF("Sniffer: read socket(socket[%u])\n", _ev_info->i_socket_fd);
 				/* Write data to Serial Socket */
 				if (si_serial_port_fd > 0) {
+					PRINTF("Sniffer: write socket(socket[%u])\n", si_serial_port_fd);
 					write(si_serial_port_fd, suc_sniffer_rcv_buf, i_bytes);
 				}
 			} else {

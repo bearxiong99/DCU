@@ -102,23 +102,15 @@ static int _parse_arguments(int argc, char** argv, x_serial_args_t *serial_args)
 	           if (long_options[option_index].flag != 0) {
 	        	   break;
 	           }
-	           PRINTF (PRINT_WARN,"Option %s", long_options[option_index].name);
-	           if (optarg) {
-	        	   PRINTF(PRINT_WARN," with arg %s", optarg);
-	           }
-	           PRINTF (PRINT_WARN,"\n");
 	           break;
 
 	   		case 'b':
-	   			PRINTF(PRINT_INFO,"Option -b  [baudrate] with value `%s'\n", optarg);
 	   			if(_getParseInt(optarg,(int*)&serial_args->ui_baudrate) != 0) {
-	   				PRINTF(PRINT_ERROR,"Error parsing integer: %s\n", optarg);
 	   		   		return -1;
 	   		   	}
 	   		   	break;
 
 	   		case 't':
-	   			PRINTF(PRINT_INFO,"Option -t  [tty] with value `%s'\n", optarg);
 	   			strncpy(serial_args->sz_tty_name, optarg, 255);
 	   			break;
 
@@ -139,12 +131,14 @@ int main(int argc, char** argv)
 	int pi_usi_fds;
 	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200};
 
+	PRINTF_INIT();
+
 	/* Load command line parameters */
 	if (_parse_arguments(argc,argv, &serial_args) < 0) {
-		printf("PLC Manager v%d,%d\n", PLC_MNG_VERSION_HI, PLC_MNG_VERSION_LO);
-		printf("Error, check arguments.\n");
-		printf("\t-t tty                : tty device connecting to a base node, default: /dev/ttyUSB0 \n");
-		printf("\t-b baudrate           : tty baudrate configuration, default: 115200\n");
+		PRINTF("PLC Manager v%d,%d\n", PLC_MNG_VERSION_HI, PLC_MNG_VERSION_LO);
+		PRINTF("Error, check arguments.\n");
+		PRINTF("\t-t tty                : tty device connecting to a base node, default: /dev/ttyUSB0 \n");
+		PRINTF("\t-b baudrate           : tty baudrate configuration, default: 115200\n");
 		exit(-1);
 	}
 
@@ -157,14 +151,14 @@ int main(int argc, char** argv)
 	/* Open SNIFFER server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_SNIFFER_APP_ID, INADDR_ANY, PLC_MNG_SNIFFER_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF(PRINT_ERROR,"Cannot open Sniffer Server socket.");
+		PRINTF("Cannot open Sniffer Server socket.");
 		exit(-1);
 	}
 
 	/* Open PRIME Manager server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_PRIMEMNG_APP_ID, INADDR_ANY, PLC_MNG_PRIMEMNG_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF(PRINT_ERROR,"Cannot open Prime Manager Server socket.");
+		PRINTF("Cannot open Prime Manager Server socket.");
 		exit(-1);
 	}
 
@@ -172,21 +166,21 @@ int main(int argc, char** argv)
 	//i_socket_res =  socket_create_server(PLC_MNG_CLI_APP_ID, INADDR_LOOPBACK, PLC_MNG_CLI_APP_PORT);
 	i_socket_res =  socket_create_server(PLC_MNG_CLI_APP_ID, INADDR_ANY, PLC_MNG_CLI_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF(PRINT_ERROR,"Cannot open CLI internal Server socket.");
+		PRINTF("Cannot open CLI internal Server socket.");
 		exit(-1);
 	}
 
 	/* Open DLMSoTCP internal server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_DLMSoTCP_APP_ID, INADDR_ANY, PLC_MNG_DLMSoTCP_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF(PRINT_ERROR,"Cannot open DLMSoTCP internal Server socket.");
+		PRINTF("Cannot open DLMSoTCP internal Server socket.");
 		exit(-1);
 	}
 
 	/* Open DLMS_EMU internal server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_DLMS_APP_ID, INADDR_ANY, PLC_MNG_DLMS_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF(PRINT_ERROR,"Cannot open DLMSoTCP internal Server socket.");
+		PRINTF("Cannot open DLMSoTCP internal Server socket.");
 		exit(-1);
 	}
 
@@ -194,7 +188,7 @@ int main(int argc, char** argv)
 	usi_host_init();
 	pi_usi_fds = usi_host_open(serial_args.sz_tty_name, serial_args.ui_baudrate);
 	if (pi_usi_fds == SOCKET_ERROR) {
-		printf("Cannot open Serial Port socket\n");
+		PRINTF("Cannot open Serial Port socket\n");
 		exit(-1);
 	} else {
 		/* Add listener to USI port */
@@ -240,7 +234,6 @@ int main(int argc, char** argv)
 					break;
 
 				case SOCKET_ERROR:
-					PRINTF(PRINT_ERROR,"Error. Socket Select failed\n");
 					/* Reset sockets */
 					//socket_restart();
 					/* Reset applications */
