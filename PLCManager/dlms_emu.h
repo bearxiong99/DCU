@@ -11,7 +11,7 @@
 #define DLMS_EMU_TIME_WAITING_IDLE           (45)
 
 /* waiting time after cycling all nodes */
-#define DLMS_EMU_TIME_BETWEEEN_CYCLES        (30)
+#define DLMS_EMU_TIME_BETWEEEN_CYCLES        (5)
 
 /* waiting time before cycling the next node */
 #define DLMS_EMU_TIME_WAIT_NODES             (10)

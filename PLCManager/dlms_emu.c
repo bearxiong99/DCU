@@ -447,7 +447,7 @@ static void _st_machine(uint16_t us_index, dlms_status_tag_t dlms_status, cmd_cy
 
 	case CMD_INDICATION:
 		if (dlms_status == RELEASE_REQUEST) {
-			_start_timer_ms("next_cycle", &st_next_cycle_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
+			_start_timer_sec("next_cycle", &st_next_cycle_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
 		} else {
 			_start_timer_ms("next_step", &st_next_step_timer, DLMS_EMU_TIME_WAIT_BETWEEN_MESSAGES, 0);
 		}break;
