@@ -15,4 +15,8 @@ void dlms_emu_report_start_cycle(void);
 void dlms_emu_report_end_cycle(void);
 void dlms_emu_report_node_cycle(dlms_report_info_t *x_node_info);
 
+int dlms_emu_report_xml_init(void);
+void dlms_emu_report_xml_end(int xml_fd);
+void dlms_emu_report_xml_add_node(int xml_fd, x_node_list_t *px_node);
+
 #endif /* DLMS_EMU_REPORT_H_INCLUDED */

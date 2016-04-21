@@ -1,6 +1,9 @@
 #ifndef DLMS_EMU_H_INCLUDED
 #define DLMS_EMU_H_INCLUDED
 
+#include <stdint.h>
+#include "socket_handler.h"
+
 /* define load curve length in the dlms query */
 #define S02_NUMBEROFDAYS 2
 
@@ -34,6 +37,13 @@ enum dlms_emu_commands {
 	DLMS_EMU_CMD_START_CYCLES = 0x31,
 	DLMS_EMU_CMD_INVALD
 };
+
+typedef struct {
+	uint16_t dst_address;
+	uint8_t serial_number[16];
+	uint8_t len_serial_number;
+	uint8_t mac[6];
+} x_node_list_t;
 
 void dlms_emu_init(int _app_id);
 void dlms_emu_callback(socket_ev_info_t *_ev_info);

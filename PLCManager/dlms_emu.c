@@ -1,7 +1,9 @@
+#include <stdint.h>
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "cl_432_defs.h"
 #include "mac_defs.h"
@@ -48,12 +50,7 @@ typedef enum {
 	RELEASE_REQUEST
 } dlms_status_tag_t;
 
-static struct {
-	uint16_t dst_address;
-	uint8_t serial_number[16];
-	uint8_t len_serial_number;
-	uint8_t mac[6];
-} sx_list_nodes[DLMS_EMU_MAX_NUM_NODES_CONNECTED];
+static x_node_list_t sx_list_nodes[DLMS_EMU_MAX_NUM_NODES_CONNECTED];
 
 /* store the maximum index in the list of connected nodes */
 static uint16_t sus_max_index_connected_node;
@@ -83,7 +80,6 @@ static dlms_report_info_t sx_node_report_info;
 static int si_dlms_emu_link_fd;
 static int si_dlms_emu_data_fd;
 static unsigned char suc_dlms_emu_buf[MAX_DLMSEMU_SOCKET_SIZE];
-
 
 /* standard low security level association request */
 uint8_t cmd_DLMS_associationRequest[] = {
@@ -435,6 +431,7 @@ static void _st_machine(uint16_t us_index, dlms_status_tag_t dlms_status, cmd_cy
 		if (sx_list_nodes[us_index].dst_address != CL_432_INVALID_ADDRESS) {
 			uc_length_msg = _generate_str(dlms_status, 0xc1);
 			ifacePrime_select_api(si_dlms_emu_app_id);
+			PRINTF("DLMS EMU: Send to %u node\n", us_index);
 			prime_cl_432_dl_data_request(0, 0, us_index, &sx_cmd_tx_432, uc_length_msg, 0);
 		} else {
 			_cycle_next_node();
@@ -446,11 +443,8 @@ static void _st_machine(uint16_t us_index, dlms_status_tag_t dlms_status, cmd_cy
 		break;
 
 	case CMD_INDICATION:
-		if (dlms_status == RELEASE_REQUEST) {
-			_start_timer_sec("next_cycle", &st_next_cycle_timer, DLMS_EMU_TIME_BETWEEEN_CYCLES, 0);
-		} else {
-			_start_timer_ms("next_step", &st_next_step_timer, DLMS_EMU_TIME_WAIT_BETWEEN_MESSAGES, 0);
-		}break;
+		_start_timer_ms("next_step", &st_next_step_timer, DLMS_EMU_TIME_WAIT_BETWEEN_MESSAGES, 0);
+		break;
 
 	case CMD_TIMEOUT:
 		sx_node_report_info.i_element_id = suc_current_node_dlms_step;

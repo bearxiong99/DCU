@@ -5,6 +5,9 @@
  *      Author: cristian.guemes
  */
 
+#ifndef SOCKET_HANDLER_H_INCLUDED
+#define SOCKET_HANDLER_H_INCLUDED
+
 #include <sys/types.h>
 #include <stdbool.h>
 
@@ -49,3 +52,4 @@ void socket_accept_conn(socket_ev_info_t *_event_info);
 int socket_get_fd(int _app_id);
 int socket_get_connections_fds(int _app_id, int *_puc_connections);
 
+#endif  /* SOCKET_HANDLER_H_INCLUDED */

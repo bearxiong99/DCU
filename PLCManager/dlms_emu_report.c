@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "dlms_emu.h"
 #include "dlms_emu_report.h"
 
 static char spuc_conf_name[20];

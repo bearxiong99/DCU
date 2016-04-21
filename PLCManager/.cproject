@@ -39,7 +39,7 @@
 								<option id="gnu.cpp.compiler.option.debugging.level.400945082" name="Debug Level" superClass="gnu.cpp.compiler.option.debugging.level" useByScannerDiscovery="false" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.cross.c.linker.333126021" name="Cross GCC Linker" superClass="cdt.managedbuild.tool.gnu.cross.c.linker">
-								<option id="gnu.c.link.option.ldflags.578313419" superClass="gnu.c.link.option.ldflags" value="-lrt" valueType="string"/>
+								<option id="gnu.c.link.option.ldflags.578313419" name="Linker flags" superClass="gnu.c.link.option.ldflags" value="-lrt" valueType="string"/>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.1109535686" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
