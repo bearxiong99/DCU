@@ -575,9 +575,9 @@ void _dlms_mngp_rsp_cb(uint8_t* ptrMsg, uint16_t len)
 			}
 
 			if ((uc_records == 0) || (uc_records < MNGP_PRIME_ENHANCED_LIST_MAX_RECORDS)) {
-				/* End query */
-				PRINTF("DLMS EMU: Updated Connected Nodes Table\n");
-				_start_cycle();
+					/* End query */
+					PRINTF("DLMS EMU: Updated Connected Nodes Table\n");
+					_start_cycle();
 			} else {
 				uint16_t us_bigendian_iterator = 0;
 
@@ -842,7 +842,6 @@ static void _dlms_emu_rcv_cmd(uint8_t* buf, uint16_t buflen)
 			_stop_cycles();
 		}
     	break;
-
     }
 }
 

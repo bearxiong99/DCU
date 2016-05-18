@@ -1,8 +1,10 @@
 #ifndef XML_REP_H_INCLUDED
 #define XML_REP_H_INCLUDED
 
-int xml_rep_open(void);
-void xml_rep_close(int xml_fd);
+int xml_rep_open_nodelist(void);
+void xml_rep_close_nodelist(int xml_fd);
 void xml_rep_add_node(int xml_fd, x_cli_node_reg_t *px_node);
+
+void xml_rep_prime_info(x_cli_prime_info_t *x_info);
 
 #endif /* XML_REP_H_INCLUDED */

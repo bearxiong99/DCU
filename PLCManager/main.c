@@ -195,30 +195,30 @@ int main(int argc, char** argv)
 		socket_attach_connection(PLC_MNG_USI_APP_ID, pi_usi_fds);
 	}
 
-	/* Init Sniffer APP : Serve to SNIFFER tool. */
-	sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
 	/* Register SNIFFER APP callback */
 	app_cbs[PLC_MNG_SNIFFER_APP_ID] = sniffer_callback;
+	/* Init Sniffer APP : Serve to SNIFFER tool. */
+	sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
 
-	/* Init Prime Manager APP : Serve to Prime Manager Tool. */
-	prime_manager_init(PLC_MNG_PRIMEMNG_APP_ID, pi_usi_fds);
 	/* Register SNIFFER APP callback */
 	app_cbs[PLC_MNG_PRIMEMNG_APP_ID] = prime_manager_callback;
+	/* Init Prime Manager APP : Serve to Prime Manager Tool. */
+	prime_manager_init(PLC_MNG_PRIMEMNG_APP_ID, pi_usi_fds);
 
-	/* Init CLI app */
-	cli_init(PLC_MNG_CLI_APP_ID);
 	/* Register CLI internal APP callback */
 	app_cbs[PLC_MNG_CLI_APP_ID] = cli_callback;
-
 	/* Init CLI app */
-	dlmsotcp_init(PLC_MNG_DLMSoTCP_APP_ID);
+	cli_init(PLC_MNG_CLI_APP_ID);
+
 	/* Register CLI internal APP callback */
 	app_cbs[PLC_MNG_DLMSoTCP_APP_ID] = dlmsotcp_callback;
-
 	/* Init CLI app */
-	dlms_emu_init(PLC_MNG_DLMS_APP_ID);
+	dlmsotcp_init(PLC_MNG_DLMSoTCP_APP_ID);
+
 	/* Register CLI internal APP callback */
 	app_cbs[PLC_MNG_DLMS_APP_ID] = dlms_emu_callback;
+	/* Init CLI app */
+	dlms_emu_init(PLC_MNG_DLMS_APP_ID);
 
 	while(1) {
 		int i_res;
@@ -231,6 +231,8 @@ int main(int argc, char** argv)
 				case SOCKET_TIMEOUT:
 					/* Process USI */
 					usi_host_process();
+					/* Process CLI */
+					cli_process();
 					break;
 
 				case SOCKET_ERROR:
