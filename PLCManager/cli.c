@@ -28,11 +28,24 @@ static bool sb_update_to_xml;
 static x_cli_prime_info_t sx_prime_info;
 static uint8_t suc_info_status;
 
+static x_cli_node_vs_t sx_cli_nodes_version[CLI_NUM_MAX_NODE_VS];
+
 static void _get_registered_nodes(void)
 {
 	sb_update_to_xml = true;
 	ifacePrime_select_api(si_cli_app_id);
 	prime_cl_null_mlme_list_get_request(PIB_MAC_LIST_REGISTER_DEVICES);
+}
+
+static void _get_version_nodes(void)
+{
+	uint8_t puc_eui48[6];
+
+	memset(puc_eui48, 0xFF, 6);
+
+	/* Get version for all nodes */
+	ifacePrime_select_api(si_cli_app_id);
+	bmng_fup_get_version_request(puc_eui48);
 }
 
 static void _get_pib(uint16_t us_pib)
@@ -111,6 +124,8 @@ static void _prime_cl_null_mlme_list_get_cfm_cb(mlme_result_t x_status, uint16_t
 	if (sb_update_to_xml) {
 		uint8_t *puc_buff;
 		x_cli_node_reg_t x_node;
+		x_cli_node_vs_t *px_node_info;
+		uint8_t uc_node_idx;
 		int i;
 		int xml_fd;
 
@@ -137,7 +152,19 @@ static void _prime_cl_null_mlme_list_get_cfm_cb(mlme_result_t x_status, uint16_t
 			x_node.uc_mac_cap2 = *puc_buff++;
 
 			/* add node to xml file */
-			xml_rep_add_node(xml_fd, &x_node);
+			px_node_info = sx_cli_nodes_version;
+			for (uc_node_idx = 0; uc_node_idx < CLI_NUM_MAX_NODE_VS; uc_node_idx++, px_node_info++) {
+				if (memcmp(px_node_info->puc_eui48, x_node.mac_addr, 6) == 0) {
+					break;
+				}
+			}
+
+			if (uc_node_idx == CLI_NUM_MAX_NODE_VS) {
+				xml_rep_add_node(xml_fd, &x_node, NULL);
+			} else {
+				xml_rep_add_node(xml_fd, &x_node, px_node_info);
+			}
+
 		}
 
 		/* close xml file */
@@ -238,6 +265,54 @@ static void _network_event_ind_cb(bmng_net_event_t *px_net_event)
 	}
 }
 
+static void _fup_version_ind_cb (uint8_t* puc_eui48, uint8_t uc_vendor_len, uint8_t * puc_vendor,
+        uint8_t uc_model_len,  uint8_t * puc_model, uint8_t uc_version_len, uint8_t * puc_version)
+{
+	x_cli_node_vs_t *px_node_info;
+	uint8_t uc_idx;
+	uint8_t puc_null_eui48[6];
+	uint8_t uc_free_idx;
+
+	/* Search NODE MAC in table */
+	memset(puc_null_eui48, 0, 6);
+	px_node_info = sx_cli_nodes_version;
+	uc_free_idx = 0xFF;
+	for (uc_idx = 0; uc_idx < CLI_NUM_MAX_NODE_VS; uc_idx++, px_node_info++) {
+		if (memcmp(px_node_info->puc_eui48, puc_eui48, 6) == 0) {
+			/* update node version */
+			memcpy(px_node_info->puc_fw_version, puc_version, uc_version_len);
+			memcpy(px_node_info->puc_model, puc_model, uc_model_len);
+			memcpy(px_node_info->puc_vendor, puc_vendor, uc_vendor_len);
+			/* End strings */
+			px_node_info->puc_fw_version[uc_version_len] = *(uint8_t *)"\0";
+			px_node_info->puc_model[uc_model_len] = *(uint8_t *)"\0";
+			px_node_info->puc_vendor[uc_vendor_len] = *(uint8_t *)"\0";
+
+			return;
+		} else if (uc_free_idx == 0xFF) {
+			if (memcmp(px_node_info->puc_eui48, puc_null_eui48, 6) == 0) {
+				/* Get bookmark for first free position */
+				uc_free_idx = uc_idx;
+			}
+		}
+	}
+
+	/* update node version in bookmark */
+	if (uc_free_idx < 0xFF) {
+		px_node_info = &sx_cli_nodes_version[uc_free_idx];
+		memcpy(px_node_info->puc_eui48, puc_eui48, 6);
+		memcpy(px_node_info->puc_fw_version, puc_version, uc_version_len);
+		memcpy(px_node_info->puc_model, puc_model, uc_model_len);
+		memcpy(px_node_info->puc_vendor, puc_vendor, uc_vendor_len);
+		/* End strings */
+		px_node_info->puc_fw_version[uc_version_len] = *(uint8_t *)"\0";
+		px_node_info->puc_model[uc_model_len] = *(uint8_t *)"\0";
+		px_node_info->puc_vendor[uc_vendor_len] = *(uint8_t *)"\0";
+	}
+
+	/* Update XML Topology file */
+	xml_rep_update_node_version(px_node_info);
+}
 
 void cli_init(int _app_id)
 {
@@ -259,6 +334,7 @@ void cli_init(int _app_id)
 	prime_cl_null_set_callbacks(si_cli_app_id, &st_null_cbs);
 
 	memset(&st_bmng_cbs, 0, sizeof(st_bmng_cbs));
+	st_bmng_cbs.fup_version_ind_cb = _fup_version_ind_cb;
 	st_bmng_cbs.network_event_ind_cb = _network_event_ind_cb;
 	bmng_set_callbacks(si_cli_app_id, &st_bmng_cbs);
 
@@ -290,25 +366,9 @@ void cli_callback(socket_ev_info_t *_ev_info)
 
 void cli_process(void)
 {
-	/* Check WEB Command Text File */
-	int fd_txt;
-	char c;
-
-	fd_txt = open("/home/DCWS/public/message.txt", O_RDONLY);
-
-	if (fd_txt != -1) {
-		read(fd_txt, &c, sizeof(c));
-
-		switch (c) {
-			case PRIME_CMD_UPDATE_NODE_LIST:
-				sb_update_to_xml = true;
-				ifacePrime_select_api(si_cli_app_id);
-				prime_cl_null_mlme_list_get_request(PIB_MAC_LIST_REGISTER_DEVICES);
-				break;
-		}
-
-		remove("/home/DCWS/public/message.txt");
-	}
+	FILE *stream;
+	char *line = NULL;
+	size_t len = 0;
 
 	/* Check PRIME info status */
 	if (suc_info_status != PRIME_INFO_OK) {
@@ -342,5 +402,61 @@ void cli_process(void)
 			break;
 		}
 	}
+
+	/* Check WEB Command Text File */
+	stream = fopen("/home/DCWS/public/message.txt", "r+");
+	if (stream != NULL) {
+		bool b_rem;
+
+		if (getline(&line, &len, stream) != -1) {
+			switch (line[0]) {
+				case PRIME_CMD_UPDATE_NODE_LIST:
+					_get_registered_nodes();
+					b_rem = true;
+					break;
+
+				case PRIME_CMD_GET_NODE_VERSIONS:
+					_get_version_nodes();
+					b_rem = true;
+					break;
+
+				default:
+					b_rem = false;
+			}
+		}
+
+		fclose(stream);
+		if (b_rem) {
+			remove("/home/DCWS/public/message.txt");
+		}
+	}
 }
+
+/*	int fd_txt;
+	char *ptr_cmd;
+
+	fd_txt = open("/home/DCWS/public/message.txt", O_RDWR);
+
+	ptr_cmd = spuc_web_cmd;
+	if (fd_txt != -1) {
+		while(read(fd_txt, ptr_cmd++, 1) > 0) {
+			if (ptr_cmd == spuc_web_cmd + sizeof(spuc_web_cmd)) {
+				break;
+			}
+		};
+
+		switch (spuc_web_cmd[0]) {
+			case PRIME_CMD_UPDATE_NODE_LIST:
+				_get_registered_nodes();
+				break;
+
+			case PRIME_CMD_GET_NODE_VERSIONS:
+				_get_version_nodes();
+				break;
+		}
+
+		memset(&spuc_web_cmd, 0, sizeof(spuc_web_cmd));
+		remove("/home/DCWS/public/message.txt");
+	}
+}*/
 

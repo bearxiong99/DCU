@@ -247,6 +247,8 @@ int main(int argc, char** argv)
 					if (socket_evet_info.i_app_id == PLC_MNG_USI_APP_ID) {
 						/* Process USI */
 						usi_host_process();
+						/* Process CLI */
+						cli_process();
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {

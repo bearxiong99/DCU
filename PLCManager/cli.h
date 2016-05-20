@@ -26,6 +26,7 @@ enum cli_get_info_status {
 
 enum cli_commands {
 	PRIME_CMD_UPDATE_NODE_LIST = 0x30,  // Create an xml file with the content of the registered node list
+	PRIME_CMD_GET_NODE_VERSIONS,
 	PRIME_CMD_PLME_GET_PIB,
 	PRIME_CMD_PLME_GET_PIB_RSP,
 	PRIME_CMD_PLME_SET_PIB,
@@ -56,6 +57,15 @@ typedef struct {
 	uint8_t fw_version[32];
 	uint8_t mac_addr[6];
 } x_cli_prime_info_t;
+
+typedef struct {
+	uint8_t puc_vendor[32];
+	uint8_t puc_model[32];
+	uint8_t puc_fw_version[32];
+	uint8_t puc_eui48[6];
+} x_cli_node_vs_t;
+
+#define CLI_NUM_MAX_NODE_VS         10
 
 void cli_init(int _app_id);
 void cli_process(void);
