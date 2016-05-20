@@ -207,7 +207,7 @@ int main(int argc, char** argv)
 	/* Init Sniffer APP : Serve to SNIFFER tool. */
 	sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
 
-	/* Register SNIFFER APP callback */
+	/* Register PRIME MNG APP callback */
 	app_cbs[PLC_MNG_PRIMEMNG_APP_ID] = prime_manager_callback;
 	/* Init Prime Manager APP : Serve to Prime Manager Tool. */
 	prime_manager_init(PLC_MNG_PRIMEMNG_APP_ID, pi_usi_fds);

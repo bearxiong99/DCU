@@ -136,6 +136,10 @@ static void _prime_cl_null_mlme_list_get_cfm_cb(mlme_result_t x_status, uint16_t
 			return;
 		}
 
+		if (us_pib_len == 0) {
+			remove(NODELIST_END_FILE);
+		}
+
 		puc_buff = puc_pib_buff;
 		for (i = us_pib_len; i > 0; i -= sizeof(x_cli_node_reg_t)) {
 			memcpy(x_node.mac_addr, puc_buff, 6);
@@ -340,6 +344,8 @@ void cli_init(int _app_id)
 
 	suc_info_status = PRIME_INFO_GET_MAC;
 	_get_registered_nodes();
+
+	remove(NODELIST_END_FILE);
 }
 
 void cli_callback(socket_ev_info_t *_ev_info)
@@ -431,32 +437,3 @@ void cli_process(void)
 		}
 	}
 }
-
-/*	int fd_txt;
-	char *ptr_cmd;
-
-	fd_txt = open("/home/DCWS/public/message.txt", O_RDWR);
-
-	ptr_cmd = spuc_web_cmd;
-	if (fd_txt != -1) {
-		while(read(fd_txt, ptr_cmd++, 1) > 0) {
-			if (ptr_cmd == spuc_web_cmd + sizeof(spuc_web_cmd)) {
-				break;
-			}
-		};
-
-		switch (spuc_web_cmd[0]) {
-			case PRIME_CMD_UPDATE_NODE_LIST:
-				_get_registered_nodes();
-				break;
-
-			case PRIME_CMD_GET_NODE_VERSIONS:
-				_get_version_nodes();
-				break;
-		}
-
-		memset(&spuc_web_cmd, 0, sizeof(spuc_web_cmd));
-		remove("/home/DCWS/public/message.txt");
-	}
-}*/
-
