@@ -129,7 +129,14 @@ int main(int argc, char** argv)
 {
 	socket_res_t i_socket_res;
 	int pi_usi_fds;
+#if BOARD == BOARD_SAMA5EK
 	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200};
+#elif BOARD == BOARD_ARIA
+	x_serial_args_t serial_args = {"/dev/ttyS0", 115200};
+#else
+	error No board defined
+#endif
+
 
 	PRINTF_INIT();
 

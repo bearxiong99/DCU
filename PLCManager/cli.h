@@ -65,7 +65,7 @@ typedef struct {
 	uint8_t puc_eui48[6];
 } x_cli_node_vs_t;
 
-#define CLI_NUM_MAX_NODE_VS         10
+#define CLI_NUM_MAX_NODE_VS         40
 
 void cli_init(int _app_id);
 void cli_process(void);
