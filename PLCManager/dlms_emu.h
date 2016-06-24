@@ -8,7 +8,7 @@
 #define S02_NUMBEROFDAYS 2
 
 /* max number of nodes */
-#define DLMS_EMU_MAX_NUM_NODES_CONNECTED     (15 + 1)
+#define DLMS_EMU_MAX_NUM_NODES_CONNECTED     (2000 + 1)
 
 /* time waiting for next node cycles */
 #define DLMS_EMU_TIME_WAITING_IDLE           (45)
