@@ -9,11 +9,6 @@
 #include "cli.h"
 #include "xml_rep.h"
 
-#define NODELIST_TMP_FILE  "/tmp/nodelist.xml"
-#define NODELIST_END_FILE  "/home/DCWS/public/nodelist.xml"
-
-#define PRIME_INFO_FILE    "/home/DCWS/public/prime_info.xml"
-
 void xml_rep_prime_info(x_cli_prime_info_t *x_info)
 {
 	int xml_fd, i_ln_len;
