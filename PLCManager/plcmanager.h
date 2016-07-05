@@ -6,7 +6,7 @@
 
 #define BOARD_ARIA          1
 #define BOARD_SAMA5EK       2
-#define BOARD               BOARD_SAMA5EK
+#define BOARD               BOARD_ARIA
 
 #define PLC_MNG_VERSION_HI	      0x01
 #define PLC_MNG_VERSION_LO        0x01

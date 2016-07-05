@@ -132,7 +132,7 @@ int main(int argc, char** argv)
 #if BOARD == BOARD_SAMA5EK
 	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200};
 #elif BOARD == BOARD_ARIA
-	x_serial_args_t serial_args = {"/dev/ttyS0", 115200};
+	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200};
 #else
 	error No board defined
 #endif

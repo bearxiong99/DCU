@@ -797,17 +797,20 @@ void hal_usi_process(void)
 	uint8_t *puc_first_token;
 	uint8_t *puc_last_token;
 	uint16_t us_msg_size;
-	uint16_t us_msg_size_new = 0;
 	uint16_t us_msg_size_pending;
+	int i_num_rx_bytes;
 
 	us_msg_size_pending = usi_rx_buf.us_size;
 	puc_rx_aux = usi_rx_buf.puc_buf + us_msg_size_pending;
 	puc_rx_start = usi_rx_buf.puc_buf;
 
-	us_msg_size_new = read(usiMapPorts._fd, puc_rx_aux, usiMapPorts.us_rx_size);
+	i_num_rx_bytes = read(usiMapPorts._fd, puc_rx_aux, usiMapPorts.us_rx_size);
+	if (i_num_rx_bytes < 0) {
+		return;
+	}
 
 	/* Find first byte 0x7E */
-	us_msg_size_pending += us_msg_size_new;
+	us_msg_size_pending += (uint16_t)i_num_rx_bytes;
 
 	if (us_msg_size_pending) {
 		puc_first_token = memchr(puc_rx_start, (uint8_t)MSGMARK, us_msg_size_pending);
