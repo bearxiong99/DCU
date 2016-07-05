@@ -31,6 +31,7 @@
 #include "plcmanager.h"
 #include "debug.h"
 #include "cli.h"
+#include "http_mng.h"
 #include "dlms_emu.h"
 #include "sniffer.h"
 #include "prime_manager.h"
@@ -227,6 +228,9 @@ int main(int argc, char** argv)
 	/* Init CLI app */
 	//dlms_emu_init(PLC_MNG_DLMS_APP_ID);
 
+	/* Init HTTP client manager */
+	http_mng_init();
+
 	while(1) {
 		int i_res;
 		socket_ev_info_t socket_evet_info;
@@ -240,6 +244,7 @@ int main(int argc, char** argv)
 					//usi_host_process();
 					/* Process CLI */
 					cli_process();
+					http_mng_process();
 					break;
 
 				case SOCKET_ERROR:
@@ -256,6 +261,7 @@ int main(int argc, char** argv)
 						//usi_host_process();
 						/* Process CLI */
 						cli_process();
+						http_mng_process();
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {
