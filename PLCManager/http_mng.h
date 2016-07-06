@@ -11,11 +11,9 @@
 #define TRUE  1
 #define FALSE 0
 
-
-
-
-
 void http_mng_init(void);
 void http_mng_process(void);
+void http_mng_send_cmd(void);
+void http_mng_callback(socket_ev_info_t *_ev_info);
 
 #endif /* __HTTP_MNG__ */

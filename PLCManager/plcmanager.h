@@ -27,6 +27,7 @@ enum {
 	PLC_MNG_DLMS_APP_ID,
 	PLC_MNG_PYSCRIPTS_APP_ID,
 	PLC_MNG_USI_APP_ID,
+	PLC_MNG_HTTP_MNG_APP_ID,
 	PLC_MNG_MAX_APP_ID
 };
 
@@ -36,7 +37,8 @@ enum {
 	PLC_MNG_CLI_APP_PORT          = 9020,
 	PLC_MNG_DLMSoTCP_APP_PORT     = 9030,
 	PLC_MNG_DLMS_APP_PORT         = 9040,
-	PLC_MNG_PYSCRIPTS_APP_PORT    = 9050
+	PLC_MNG_PYSCRIPTS_APP_PORT    = 9050,
+	PLC_MNG_HTTP_MNG_APP_PORT     = 9060
 };
 
 typedef void (*pf_app_callback_t) (socket_ev_info_t *_ev_info);

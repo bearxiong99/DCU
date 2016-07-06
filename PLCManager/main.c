@@ -192,6 +192,13 @@ int main(int argc, char** argv)
 	//	exit(-1);
 	//}
 
+	/* Open HTTP internal NODE server socket */
+	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_LOOPBACK, PLC_MNG_HTTP_MNG_APP_PORT);
+	if (i_socket_res == SOCKET_ERROR) {
+		PRINTF("Cannot open HTTP internal NODE Server socket.");
+		exit(-1);
+	}
+
 	/* USI_HOST serial connection. */
 	//usi_host_init();
 	//pi_usi_fds = usi_host_open(serial_args.sz_tty_name, serial_args.ui_baudrate);
@@ -228,7 +235,9 @@ int main(int argc, char** argv)
 	/* Init CLI app */
 	//dlms_emu_init(PLC_MNG_DLMS_APP_ID);
 
-	/* Init HTTP client manager */
+	/* Register HTTP internal NODE APP callback */
+	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
+	/* Init HTTP client manager to connect with NODE server */
 	http_mng_init();
 
 	while(1) {
@@ -244,7 +253,7 @@ int main(int argc, char** argv)
 					//usi_host_process();
 					/* Process CLI */
 					cli_process();
-					http_mng_process();
+					http_mng_send_cmd();
 					break;
 
 				case SOCKET_ERROR:
@@ -261,7 +270,10 @@ int main(int argc, char** argv)
 						//usi_host_process();
 						/* Process CLI */
 						cli_process();
-						http_mng_process();
+//} else if (socket_evet_info.i_app_id == PLC_MNG_HTTP_MNG_APP_ID) {
+//	/* Process HTTP manager (node js) */
+//	http_mng_process();
+//}
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {
