@@ -1,15 +1,13 @@
 #include "hal_utils.h"
 
-#include "ifacePrime_api.h"
-#include "ifacePrimeSniffer.h"
-#include "ifaceMngLayer.h"
+#include "ifaceAdp_api.h"
+#include "ifaceSniffer.h"
 
 void usi_host_init()
 {
 	hal_usi_init();
-	mngLay_Init();
-	ifacePrime_api_init();
-	prime_sniffer_init();
+	ifaceAdp_api_init();
+	sniffer_init();
 }
 
 int usi_host_open(char *sz_tty_name, unsigned ui_baudrate)
@@ -37,13 +35,13 @@ void usi_host_loopback(int _fd_redirect)
 	hal_usi_loopback(_fd_redirect);
 }
 
-void usi_host_select_api(uint8_t prime_app_id)
+void usi_host_select_api(uint8_t app_id)
 {
-	ifacePrime_select_api(prime_app_id);
+	ifaceAdp_select_api(app_id);
 }
 
 void usi_host_set_sniffer_cb(void (*sap_handler)(uint8_t* msg, uint16_t len))
 {
-	prime_sniffer_set_cb(sap_handler);
+	sniffer_set_cb(sap_handler);
 }
 

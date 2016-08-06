@@ -79,12 +79,12 @@ extern "C" {
 #define LEN_PROTOCOL_LO_MSK     0xC0
 #define LEN_PROTOCOL_LO_SHIFT      6
 #define XLEN_PROTOCOL_OFFSET       2
-#define XLEN_PROTOCOL_MSK       0x80
-#define XLEN_PROTOCOL_SHIFT_L      3
+#define XLEN_PROTOCOL_MSK       0xC0
+#define XLEN_PROTOCOL_SHIFT_L      4
 #define XLEN_PROTOCOL_SHIFT_R     10
 #define PAYLOAD_OFFSET             2
 #define CMD_PROTOCOL_OFFSET        2
-#define CMD_PROTOCOL_MSK        0x7F
+#define CMD_PROTOCOL_MSK        0x3F
 /* @} */
 
 /** \brief Macro operators
@@ -98,7 +98,7 @@ extern "C" {
 	+ (((uint16_t)(C)&XLEN_PROTOCOL_MSK) << XLEN_PROTOCOL_SHIFT_L))
 #define LEN_HI_PROTOCOL(A)    (((uint16_t)(A) >> LEN_PROTOCOL_HI_SHIFT) & LEN_PROTOCOL_HI_MSK)
 #define LEN_LO_PROTOCOL(A)    (((uint16_t)(A) << LEN_PROTOCOL_LO_SHIFT) & LEN_PROTOCOL_LO_MSK)
-#define LEN_EX_PROTOCOL(A)    (((uint16_t)(A & 0x0400)) >> 3)
+#define LEN_EX_PROTOCOL(A)    (((uint16_t)(A & 0x0c00)) >> 4)
 #define CMD_PROTOCOL(A)       ((A)&CMD_PROTOCOL_MSK)
 /* @} */
 
@@ -215,20 +215,36 @@ static uint8_t _usi_prot_id2idx(usi_protocol_t protocol_id)
 		uc_prot_idx = 1;
 		break;
 
-	case PROTOCOL_ATPL230:
+	case PROTOCOL_PHY_SERIAL_PRIME:
 		uc_prot_idx = 2;
 		break;
 
-	case PROTOCOL_USER_DEFINED:
+	case PROTOCOL_PHY_ATPL2X0:
 		uc_prot_idx = 3;
 		break;
 
-	case PROTOCOL_PRIME_API:
+	case PROTOCOL_SNIF_G3:
 		uc_prot_idx = 4;
 		break;
 
-	case PROTOCOL_INTERNAL:
+	case PROTOCOL_MAC_G3:
 		uc_prot_idx = 5;
+		break;
+
+	case PROTOCOL_ADP_G3:
+		uc_prot_idx = 6;
+		break;
+
+	case PROTOCOL_COORD_G3:
+		uc_prot_idx = 7;
+		break;
+
+	case PROTOCOL_PRIME_API:
+		uc_prot_idx = 8;
+		break;
+
+	case PROTOCOL_INTERNAL:
+		uc_prot_idx = 9;
 		break;
 
 	default:
@@ -256,7 +272,8 @@ static uint8_t _process_msg(uint8_t *puc_rx_buf)
 	uc_type = TYPE_PROTOCOL(puc_rx_buf[TYPE_PROTOCOL_OFFSET]);
 
 	/* Extract length */
-	if (uc_type == PROTOCOL_PRIME_API) {
+	if ((uc_type == PROTOCOL_PRIME_API) || (uc_type == PROTOCOL_MAC_G3) ||
+	    (uc_type == PROTOCOL_ADP_G3) || (uc_type == PROTOCOL_COORD_G3)) {
 		/* Extract LEN using XLEN */
 		us_len = XLEN_PROTOCOL(puc_rx_buf[LEN_PROTOCOL_HI_OFFSET], puc_rx_buf[LEN_PROTOCOL_LO_OFFSET], puc_rx_buf[XLEN_PROTOCOL_OFFSET]);
 	} else {
@@ -271,7 +288,7 @@ static uint8_t _process_msg(uint8_t *puc_rx_buf)
 
 	/* Call decoding function depending on uc_type */
 	switch (uc_type) {
-	/* PRIME spec.v.1.3.E */
+	/* PRIME spec.v.1.3 */
 	case PROTOCOL_MNGP_PRIME_GETQRY:
 	case PROTOCOL_MNGP_PRIME_GETRSP:
 	case PROTOCOL_MNGP_PRIME_SET:
@@ -292,36 +309,20 @@ static uint8_t _process_msg(uint8_t *puc_rx_buf)
 		break;
 
 	/* Atmel's serialized protocols */
-	case PROTOCOL_ATPL230:
-		pf_serialization_function = usi_cfg_map_protocols[_usi_prot_id2idx(PROTOCOL_ATPL230)].serialization_function;
-		if (pf_serialization_function) {
-			uc_result = pf_serialization_function(&puc_rx_buf[PAYLOAD_OFFSET], us_len);
-		}
-
-		break;
-
 	case PROTOCOL_SNIF_PRIME:
-		pf_serialization_function = usi_cfg_map_protocols[_usi_prot_id2idx(PROTOCOL_SNIF_PRIME)].serialization_function;
-		if (pf_serialization_function) {
-			uc_result = pf_serialization_function(&puc_rx_buf[PAYLOAD_OFFSET], us_len);
-		}
-
-		break;
-
+	case PROTOCOL_PHY_SERIAL_PRIME:
+	case PROTOCOL_PHY_ATPL2X0:
+	case PROTOCOL_SNIF_G3:
+	case PROTOCOL_MAC_G3:
+	case PROTOCOL_ADP_G3:
+	case PROTOCOL_COORD_G3:
 	case PROTOCOL_PRIME_API:
-		pf_serialization_function = usi_cfg_map_protocols[_usi_prot_id2idx(PROTOCOL_PRIME_API)].serialization_function;
+	case PROTOCOL_INTERNAL:
+		pf_serialization_function = usi_cfg_map_protocols[_usi_prot_id2idx((usi_protocol_t)uc_type)].serialization_function;
 		if (pf_serialization_function) {
 			if (_fd_socket_loopback > 0) {
 				uc_retx_len = us_len;
 			}
-			uc_result = pf_serialization_function(&puc_rx_buf[PAYLOAD_OFFSET], us_len);
-		}
-
-		break;
-
-	case PROTOCOL_USER_DEFINED:
-		pf_serialization_function = usi_cfg_map_protocols[_usi_prot_id2idx(PROTOCOL_USER_DEFINED)].serialization_function;
-		if (pf_serialization_function) {
 			uc_result = pf_serialization_function(&puc_rx_buf[PAYLOAD_OFFSET], us_len);
 		}
 
@@ -396,7 +397,9 @@ static uint8_t _doEoMsg(uint8_t *puc_rx_buf, uint16_t us_msg_size)
 		break;
 
 	case PROTOCOL_SNIF_PRIME:
-	case PROTOCOL_ATPL230:
+	case PROTOCOL_SNIF_G3:
+	case PROTOCOL_PHY_SERIAL_PRIME:
+	case PROTOCOL_PHY_ATPL2X0:
 	case PROTOCOL_USER_DEFINED:
 		/* Get received CRC 16 */
 		puc_tb = &puc_rx_buf[us_msg_size - 2];
@@ -406,7 +409,18 @@ static uint8_t _doEoMsg(uint8_t *puc_rx_buf, uint16_t us_msg_size)
 		ul_ev_crc = hal_pcrc_calc(puc_rx_buf, us_len + 2, HAL_PCRC_HT_USI, HAL_PCRC_CRC_TYPE_16, false);
 		break;
 
-	/* Length is up to 2Kb ... use XLEN field */
+	case PROTOCOL_MAC_G3:
+	case PROTOCOL_ADP_G3:
+	case PROTOCOL_COORD_G3:
+		/* Get received CRC 16: use XLEN */
+		us_len = XLEN_PROTOCOL(puc_rx_buf[LEN_PROTOCOL_HI_OFFSET], puc_rx_buf[LEN_PROTOCOL_LO_OFFSET], puc_rx_buf[XLEN_PROTOCOL_OFFSET]);
+		puc_tb = &puc_rx_buf[us_msg_size - 2];
+		ul_rx_crc = (((uint32_t)puc_tb[0]) << 8) | ((uint32_t)puc_tb[1]);
+		/* Calculate CRC */
+		/* +2 header bytes: included in CRC */
+		ul_ev_crc = hal_pcrc_calc(puc_rx_buf, us_len + 2, HAL_PCRC_HT_USI, HAL_PCRC_CRC_TYPE_16, false);
+		break;
+
 	case PROTOCOL_PRIME_API:
 		/* Get received CRC 8: use XLEN */
 		us_len = XLEN_PROTOCOL(puc_rx_buf[LEN_PROTOCOL_HI_OFFSET], puc_rx_buf[LEN_PROTOCOL_LO_OFFSET], puc_rx_buf[XLEN_PROTOCOL_OFFSET]);
@@ -491,6 +505,11 @@ static usi_status_t _usi_encode_and_send(x_usi_cmd_t *msg)
 	int i_sent_chars;
 	int _fd_wr;
 
+	/* Len protection */
+	if (msg->us_len == 0) {
+		return USI_STATUS_FORMAT_ERROR;
+	}
+
 	us_len = msg->us_len;
 	uc_p_type = msg->uc_p_type;
 
@@ -509,7 +528,8 @@ static usi_status_t _usi_encode_and_send(x_usi_cmd_t *msg)
 	memcpy(puc_tx_buf, msg->puc_buf, us_len);
 	/* Adjust XLEN if uc_p_type is internal protocol */
 	uc_cmd = msg->puc_buf[0];
-	if (uc_p_type == PROTOCOL_PRIME_API) {
+	if ((uc_p_type == PROTOCOL_PRIME_API) || (uc_p_type == PROTOCOL_MAC_G3) ||
+	    (uc_p_type == PROTOCOL_ADP_G3) || (uc_p_type == PROTOCOL_COORD_G3)) {
 		puc_tx_buf[0] = LEN_EX_PROTOCOL(us_len) + CMD_PROTOCOL(uc_cmd);
 	}
 
@@ -540,7 +560,12 @@ static usi_status_t _usi_encode_and_send(x_usi_cmd_t *msg)
 		break;
 
 	case PROTOCOL_SNIF_PRIME:
-	case PROTOCOL_ATPL230:
+	case PROTOCOL_SNIF_G3:
+	case PROTOCOL_PHY_SERIAL_PRIME:
+	case PROTOCOL_PHY_ATPL2X0:
+	case PROTOCOL_MAC_G3:
+	case PROTOCOL_ADP_G3:
+	case PROTOCOL_COORD_G3:
 	case PROTOCOL_USER_DEFINED:
 		ul_crc = hal_pcrc_calc(&puc_tx_buf_ini[ul_idx_in_orig + 1], msg->us_len + 2, HAL_PCRC_HT_USI, HAL_PCRC_CRC_TYPE_16, false);
 		*puc_tx_buf++ = (uint8_t)(ul_crc >> 8);
@@ -761,8 +786,19 @@ static bool _check_integrity_len(uint8_t *puc_rx_start, uint16_t us_msg_len)
 		break;
 
 	case PROTOCOL_SNIF_PRIME:
-	case PROTOCOL_ATPL230:
+	case PROTOCOL_SNIF_G3:
+	case PROTOCOL_PHY_SERIAL_PRIME:
+	case PROTOCOL_PHY_ATPL2X0:
 	case PROTOCOL_USER_DEFINED:
+		us_len += 2;
+		break;
+
+	/* Length is up to 2Kb ... use XLEN field */
+	case PROTOCOL_MAC_G3:
+	case PROTOCOL_ADP_G3:
+	case PROTOCOL_COORD_G3:
+		/* Get received CRC 16: use XLEN */
+		us_len = XLEN_PROTOCOL(puc_data[LEN_PROTOCOL_HI_OFFSET], puc_data[LEN_PROTOCOL_LO_OFFSET], puc_data[XLEN_PROTOCOL_OFFSET]);
 		us_len += 2;
 		break;
 

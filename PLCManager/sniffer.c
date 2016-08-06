@@ -12,6 +12,9 @@
 
 #include "debug.h"
 
+//#define SNIFFER_PROTOCOL_IN_USE            0x13  //PROTOCOL_SNIF_PRIME
+#define SNIFFER_PROTOCOL_IN_USE            0x23  //PROTOCOL_SNIF_G3
+
 /* Serial Port descriptor */
 static int si_serial_port_fd;
 static int si_sniffer_socket_fd;
@@ -33,7 +36,7 @@ static void _sniffer_data_rcv(uint8_t *msg, uint16_t len)
 
 		usi_cmd.puc_buf = msg; /* remove usi headers */
 		usi_cmd.us_len = len; /* rest headers + crc bytes */
-		usi_cmd.uc_p_type = 0x13; /* PROTOCOL_SNIF_PRIME */
+		usi_cmd.uc_p_type = SNIFFER_PROTOCOL_IN_USE;
 		for (idx = 0; idx < SOCKET_MAX_CONN; idx++) {
 			if (pi_conn_fds[idx] > 0) {
 				usi_cmd._fd = pi_conn_fds[idx];

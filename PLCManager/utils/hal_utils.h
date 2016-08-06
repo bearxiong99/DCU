@@ -22,27 +22,30 @@ extern "C" {
 
 /** Serial Protocols */
 typedef enum {
-	PROTOCOL_MNGP_PRIME           = 0x00,
-	PROTOCOL_MNGP_PRIME_GETQRY    = 0x00,
-	PROTOCOL_MNGP_PRIME_GETRSP    = 0x01,
-	PROTOCOL_MNGP_PRIME_SET       = 0x02,
-	PROTOCOL_MNGP_PRIME_RESET     = 0x03,
-	PROTOCOL_MNGP_PRIME_REBOOT    = 0x04,
-	PROTOCOL_MNGP_PRIME_FU        = 0x05,
-	PROTOCOL_MNGP_PRIME_GETQRY_EN = 0x06,
-	PROTOCOL_MNGP_PRIME_GETRSP_EN = 0x07,
-	PROTOCOL_MNGP_PRIME_LISTQRY   = 0x0E,
-	PROTOCOL_MNGP_PRIME_LISTRSP   = 0x0F,
-	PROTOCOL_SNIF_PRIME           = 0x13,
-	PROTOCOL_ATPL230              = 0x22,
-	PROTOCOL_PRIME_API            = 0x30,
-	PROTOCOL_INTERNAL             = 0x3F,
-	PROTOCOL_USER_DEFINED         = 0xFE,
-	PROTOCOL_INVALID              = 0xFF
+	PROTOCOL_MNGP_PRIME               = 0x00,
+	PROTOCOL_MNGP_PRIME_GETQRY        = 0x00,
+	PROTOCOL_MNGP_PRIME_GETRSP        = 0x01,
+	PROTOCOL_MNGP_PRIME_SET           = 0x02,
+	PROTOCOL_MNGP_PRIME_RESET         = 0x03,
+	PROTOCOL_MNGP_PRIME_REBOOT        = 0x04,
+	PROTOCOL_MNGP_PRIME_FU            = 0x05,
+	PROTOCOL_MNGP_PRIME_GETQRY_EN     = 0x06,
+	PROTOCOL_MNGP_PRIME_GETRSP_EN     = 0x07,
+	PROTOCOL_SNIF_PRIME               = 0x13,
+	PROTOCOL_PHY_SERIAL_PRIME         = 0x1F,
+	PROTOCOL_PHY_ATPL2X0              = 0x22,
+	PROTOCOL_SNIF_G3                  = 0x23,
+	PROTOCOL_MAC_G3                   = 0x24,
+	PROTOCOL_ADP_G3                   = 0x25,
+	PROTOCOL_COORD_G3                 = 0x26,
+	PROTOCOL_PRIME_API                = 0x30,
+	PROTOCOL_INTERNAL                 = 0x3F,
+	PROTOCOL_USER_DEFINED             = 0xFE,
+	PROTOCOL_INVALID                  = 0xFF
 } usi_protocol_t;
 
 /** Number of USI supported protocols */
-#define USI_NUMBER_OF_PROTOCOLS            6
+#define USI_NUMBER_OF_PROTOCOLS            10
 /** Invalid protocol index */
 #define USI_INVALID_PROTOCOL_IDX           0xFF
 

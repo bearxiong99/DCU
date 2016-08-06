@@ -27,8 +27,12 @@
 								<option id="gnu.c.compiler.option.include.paths.712503801" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="."/>
 									<listOptionValue builtIn="false" value=".."/>
-									<listOptionValue builtIn="false" value="../utils/"/>
-									<listOptionValue builtIn="false" value="../usi_host/"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/common}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/cyclone_tcp}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/module_config}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/utils}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/usi_host}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/bootstrap}&quot;"/>
 								</option>
 								<option id="gnu.c.compiler.option.dialect.std.78304442" name="Language standard" superClass="gnu.c.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.c.compiler.dialect.default" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.misc.other.1409530559" name="Other flags" superClass="gnu.c.compiler.option.misc.other" useByScannerDiscovery="false" value="-c -fmessage-length=0" valueType="string"/>
@@ -52,6 +56,10 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
+					<fileInfo id="cdt.managedbuild.config.gnu.cross.exe.debug.1819232716.47610366" name="dlms_emu_report.h" rcbsApplicability="disable" resourcePath="dlms_emu_report.h" toolsToInvoke=""/>
+					<sourceEntries>
+						<entry excluding="usi_host/prime" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+					</sourceEntries>
 				</configuration>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>

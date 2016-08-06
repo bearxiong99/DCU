@@ -50,7 +50,7 @@ static void _build_get_query(char *page)
 	sprintf((char *)suc_http_tx_buf, tpl, getpage, HOST, USERAGENT);
 	//return query;
 }
-
+/*
 static void _build_post_query(char *page)
 {
 	//char *query;
@@ -65,7 +65,7 @@ static void _build_post_query(char *page)
 	sprintf((char *)suc_http_tx_buf, tpl, getpage, HOST, USERAGENT);
 	//return query;
 }
-
+*/
 /**
  * \brief Process command/response received from NODE JS.
  */

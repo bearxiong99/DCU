@@ -29,13 +29,10 @@
 
 #include "socket_handler.h"
 #include "plcmanager.h"
+#include "app_adp_mng.h"
 #include "debug.h"
-#include "cli.h"
 #include "http_mng.h"
-#include "dlms_emu.h"
 #include "sniffer.h"
-#include "prime_manager.h"
-#include "dlmsotcp.h"
 #include "usi_host.h"
 #include "hal_utils.h"
 
@@ -157,88 +154,51 @@ int main(int argc, char** argv)
 	socket_init();
 
 	/* Open SNIFFER server socket */
-	//i_socket_res =  socket_create_server(PLC_MNG_SNIFFER_APP_ID, INADDR_ANY, PLC_MNG_SNIFFER_APP_PORT);
-	//if (i_socket_res == SOCKET_ERROR) {
-	//	PRINTF("Cannot open Sniffer Server socket.");
-	//	exit(-1);
-	//}
-
-	/* Open PRIME Manager server socket */
-	//i_socket_res =  socket_create_server(PLC_MNG_PRIMEMNG_APP_ID, INADDR_ANY, PLC_MNG_PRIMEMNG_APP_PORT);
-	//if (i_socket_res == SOCKET_ERROR) {
-	//	PRINTF("Cannot open Prime Manager Server socket.");
-	//	exit(-1);
-	//}
-
-	/* Open CLI internal server socket */
-	i_socket_res =  socket_create_server(PLC_MNG_CLI_APP_ID, INADDR_LOOPBACK, PLC_MNG_CLI_APP_PORT);
-	//i_socket_res =  socket_create_server(PLC_MNG_CLI_APP_ID, INADDR_ANY, PLC_MNG_CLI_APP_PORT);
+	i_socket_res =  socket_create_server(PLC_MNG_SNIFFER_APP_ID, INADDR_ANY, PLC_MNG_SNIFFER_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF("Cannot open CLI internal Server socket.");
+		PRINTF("Cannot open Sniffer Server socket.");
 		exit(-1);
 	}
 
-	/* Open DLMSoTCP internal server socket */
-	//i_socket_res =  socket_create_server(PLC_MNG_DLMSoTCP_APP_ID, INADDR_ANY, PLC_MNG_DLMSoTCP_APP_PORT);
-	//if (i_socket_res == SOCKET_ERROR) {
-	//	PRINTF("Cannot open DLMSoTCP internal Server socket.");
-	//	exit(-1);
-	//}
-
-	/* Open DLMS_EMU internal server socket */
-	//i_socket_res =  socket_create_server(PLC_MNG_DLMS_APP_ID, INADDR_ANY, PLC_MNG_DLMS_APP_PORT);
-	//if (i_socket_res == SOCKET_ERROR) {
-	//	PRINTF("Cannot open DLMSoTCP internal Server socket.");
-	//	exit(-1);
-	//}
-
-	/* Open HTTP internal NODE server socket */
-	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_LOOPBACK, PLC_MNG_HTTP_MNG_APP_PORT);
+	/* Open ADP internal server socket */
+	i_socket_res =  socket_create_server(PLC_MNG_DLMS_APP_ID, INADDR_ANY, PLC_MNG_DLMS_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF("Cannot open HTTP internal NODE Server socket.");
+		PRINTF("Cannot open DLMSoTCP internal Server socket.");
 		exit(-1);
 	}
+
+//	/* Open HTTP internal NODE server socket */
+//	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_LOOPBACK, PLC_MNG_HTTP_MNG_APP_PORT);
+//	if (i_socket_res == SOCKET_ERROR) {
+//		PRINTF("Cannot open HTTP internal NODE Server socket.");
+//		exit(-1);
+//	}
 
 	/* USI_HOST serial connection. */
-	//usi_host_init();
-	//pi_usi_fds = usi_host_open(serial_args.sz_tty_name, serial_args.ui_baudrate);
-	//if (pi_usi_fds == SOCKET_ERROR) {
-	//	PRINTF("Cannot open Serial Port socket\n");
-	//	exit(-1);
-	//} else {
-	//	/* Add listener to USI port */
-	//	socket_attach_connection(PLC_MNG_USI_APP_ID, pi_usi_fds);
-	//}
+	usi_host_init();
+	pi_usi_fds = usi_host_open(serial_args.sz_tty_name, serial_args.ui_baudrate);
+	if (pi_usi_fds == SOCKET_ERROR) {
+		PRINTF("Cannot open Serial Port socket\n");
+		exit(-1);
+	} else {
+		/* Add listener to USI port */
+		socket_attach_connection(PLC_MNG_USI_APP_ID, pi_usi_fds);
+	}
 
 	/* Register SNIFFER APP callback */
-	//app_cbs[PLC_MNG_SNIFFER_APP_ID] = sniffer_callback;
+	app_cbs[PLC_MNG_SNIFFER_APP_ID] = sniffer_callback;
 	/* Init Sniffer APP : Serve to SNIFFER tool. */
-	//sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
+	sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
 
-	/* Register PRIME MNG APP callback */
-	//app_cbs[PLC_MNG_PRIMEMNG_APP_ID] = prime_manager_callback;
-	/* Init Prime Manager APP : Serve to Prime Manager Tool. */
-	//prime_manager_init(PLC_MNG_PRIMEMNG_APP_ID, pi_usi_fds);
-
-	/* Register CLI internal APP callback */
-	app_cbs[PLC_MNG_CLI_APP_ID] = cli_callback;
+	/* Register DLMS internal APP callback */
+	app_cbs[PLC_MNG_DLMS_APP_ID] = adp_mng_callback;
 	/* Init CLI app */
-	cli_init(PLC_MNG_CLI_APP_ID);
+	adp_mng_init(PLC_MNG_DLMS_APP_ID);
 
-	/* Register CLI internal APP callback */
-	//app_cbs[PLC_MNG_DLMSoTCP_APP_ID] = dlmsotcp_callback;
-	/* Init CLI app */
-	//dlmsotcp_init(PLC_MNG_DLMSoTCP_APP_ID);
-
-	/* Register CLI internal APP callback */
-	//app_cbs[PLC_MNG_DLMS_APP_ID] = dlms_emu_callback;
-	/* Init CLI app */
-	//dlms_emu_init(PLC_MNG_DLMS_APP_ID);
-
-	/* Register HTTP internal NODE APP callback */
-	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
-	/* Init HTTP client manager to connect with NODE server */
-	http_mng_init();
+//	/* Register HTTP internal NODE APP callback */
+//	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
+//	/* Init HTTP client manager to connect with NODE server */
+//	http_mng_init();
 
 	while(1) {
 		int i_res;
@@ -250,10 +210,9 @@ int main(int argc, char** argv)
 		switch (i_res) {
 				case SOCKET_TIMEOUT:
 					/* Process USI */
-					//usi_host_process();
-					/* Process CLI */
-					cli_process();
-					http_mng_send_cmd();
+					usi_host_process();
+					//http_mng_send_cmd();
+					adp_mng_process();
 					break;
 
 				case SOCKET_ERROR:
@@ -267,13 +226,11 @@ int main(int argc, char** argv)
 					/* Send event to APP */
 					if (socket_evet_info.i_app_id == PLC_MNG_USI_APP_ID) {
 						/* Process USI */
-						//usi_host_process();
-						/* Process CLI */
-						cli_process();
-//} else if (socket_evet_info.i_app_id == PLC_MNG_HTTP_MNG_APP_ID) {
-//	/* Process HTTP manager (node js) */
-//	http_mng_process();
-//}
+						usi_host_process();
+						adp_mng_process();
+//					} else if (socket_evet_info.i_app_id == PLC_MNG_HTTP_MNG_APP_ID) {
+//						/* Process HTTP manager (node js) */
+//						http_mng_process();
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {
