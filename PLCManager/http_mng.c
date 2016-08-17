@@ -14,7 +14,7 @@
 #include <arpa/inet.h>
 #include "socket_handler.h"
 #include "http_mng.h"
-#include "debug.h"
+#include "app_debug.h"
 #include "plcmanager.h"
 
 /* http client socket descriptors */

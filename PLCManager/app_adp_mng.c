@@ -13,7 +13,7 @@
 #include "AdpApiTypes.h"
 
 #include "Config.h"
-#include "debug.h"
+#include "app_debug.h"
 
 #include "drivers/g3/network_adapter_g3.h"
 #include "app_adp_mng.h"
@@ -93,6 +93,9 @@ static void SetConfirm(uint8_t u8Status, uint32_t u32AttributeId, uint16_t u16At
 					g_MibSettings[g_u8MibInitIndex].m_u32Id, g_MibSettings[g_u8MibInitIndex].m_u16Index,
 					u32AttributeId, u16AttributeIndex));
 			}
+		} else {
+			/* out of range */
+			b_send_pib = false;
 		}
 	} else {
 		LOG_APP_DEBUG(("ERR[AppAdpSetConfirm] status: %u\r\n", u8Status));
@@ -256,6 +259,7 @@ static void InitializeStack(void)
 	notifications.fnctAdpNetworkStatusIndication = AppAdpNetworkStatusIndication;
 	notifications.fnctAdpBufferIndication = AppAdpBufferIndication;
 	notifications.fnctAdpUpdNonVolatileDataIndication = AppAdpNotification_UpdNonVolatileDataIndication;
+	notifications.fnctAdpPREQIndication = NULL;
 
 	AdpInitialize(&notifications, ADP_BAND_CENELEC_A);
 }
@@ -310,7 +314,7 @@ void adp_mng_process(void)
 		AdpNetworkStartRequest(G3_COORDINATOR_PAN_ID);
 
 		/* Init DLMS App */
-		dlms_emu_init();
+		dlms_emu_init(CONF_EXTENDED_ADDRESS);
 	}
 }
 
@@ -322,21 +326,31 @@ uint16_t app_update_registered_nodes(void *pxNodeList)
 {
 	x_node_list_t *px_list_ptr;
 	struct t_bs_lbp_get_param_confirm p_get_confirm;
-	uint16_t us_idx, us_num_devices;
+	uint16_t us_idx, us_num_devices, us_device_cnt;
 
 	px_list_ptr = pxNodeList;
 
-	// Get the number of devices from Bootstrap module
+	/* Get the number of devices from Bootstrap module */
 	us_num_devices = bs_lbp_get_lbds_counter();
+	us_device_cnt = 0;
 
-	// Update Device Addresses from Bootstrap module
-	for (us_idx = 0; us_idx < us_num_devices; us_idx++) {
-		//bs_lbp_get_param(LBP_IB_DEVICE_LIST, us_idx, &p_get_confirm);  !! NO ES COMPATIBLE CON EL MODEM
+	/* If no devices found, return */
+	if (us_num_devices == 0) {
+		return 0;
+	}
+
+	/* Update Device Addresses from Bootstrap module */
+	for (us_idx = 0; us_idx < MAX_LBDS; us_idx++) {
+		bs_lbp_get_param(LBP_IB_DEVICE_LIST, us_idx, &p_get_confirm);
 		if (p_get_confirm.uc_status == LBP_STATUS_OK) {
 			px_list_ptr->us_short_address = ((uint16_t)p_get_confirm.uc_attribute_value[1]) << 8;
 			px_list_ptr->us_short_address += ((uint16_t)p_get_confirm.uc_attribute_value[0]);
 			memcpy(px_list_ptr->puc_extended_address, &p_get_confirm.uc_attribute_value[2], sizeof(px_list_ptr->puc_extended_address));
 			px_list_ptr++;
+			us_device_cnt++;
+			if (us_device_cnt == us_num_devices) {
+				break;
+			}
 		}
 	}
 

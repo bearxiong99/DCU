@@ -55,6 +55,8 @@
 #include "app_adp_mng.h"
 #include "Config.h"
 
+#define DLMS_DEBUG_CONSOLE
+
 #define UNUSED(v)                  (void)(v)
 #define ADP_PATH_METRIC_TYPE       0
 
@@ -806,9 +808,9 @@ static error_t initialize_udp_ip_DC(void)
  * \brief Create main Cycles Application task and create timer to update internal counters.
  *
  */
-void dlms_emu_init(void)
+void dlms_emu_init(uint8_t *puc_ext_addr)
 {
-	struct TAdpMacGetConfirm getConfirm;
+	//struct TAdpMacGetConfirm getConfirm;
 
 	/* Init variables and status */
 	st_sort_cycles = SC_WAIT_INITIAL_LIST;
@@ -847,9 +849,8 @@ void dlms_emu_init(void)
 	ul_timer_max_to_req_paths = TIME_MAX_BETWEEN_PREQ_WITOUT_DATA;
 #endif
 
-	/* Get Extended Address */
-	AdpMacGetRequestSync(MAC_PIB_MANUF_EXTENDED_ADDRESS, 0, &getConfirm);
-	memcpy(spuc_extended_address, getConfirm.m_au8AttributeValue, sizeof(spuc_extended_address));
+	/* Set Extended Address */
+	memcpy(spuc_extended_address, puc_ext_addr, sizeof(spuc_extended_address));
 
 	/* Initialize UDP-IP over G3 */
 	initialize_udp_ip_DC();
@@ -893,6 +894,7 @@ static void _dlms_emu_update(void)
 		return;
 	} else {
 		ul_time_diff = ul_curr_time - sul_sys_time;
+		sul_sys_time = ul_curr_time;
 
 		/* Update counters */
 		_update_counter(&ul_timer_dlms_start_wait, ul_time_diff);
@@ -947,7 +949,7 @@ void dlms_emu_process(void)
 	case SC_WAIT_INITIAL_LIST:
 		if (sb_update_nodes) {
 			sb_update_nodes = false;
-			//us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
 			if (us_num_registered_nodes) {
 #ifdef DLMS_DEBUG_CONSOLE
@@ -994,7 +996,7 @@ void dlms_emu_process(void)
 			printf("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n");
 #endif
 			sb_update_nodes = false;
-			//us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
 #ifdef DLMS_EMU_WAIT_REG_NODES
 			ul_timer_dlms_start_wait = TIMER_WAITING_START;
@@ -1026,7 +1028,7 @@ void dlms_emu_process(void)
 #ifdef DLMS_EMU_DISABLE_CYCLES
 			break;
 #else
-/*		if (sb_update_nodes) {
+			if (sb_update_nodes) {
 #ifdef DLMS_DEBUG_CONSOLE
 			printf("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n");
 #endif
@@ -1037,7 +1039,7 @@ void dlms_emu_process(void)
 			ul_timer_dlms_start_wait = TIMER_WAITING_START;
 			break;
 #endif
-		}*/
+		}
 
 		if (us_num_registered_nodes) {
 			ul_start_time_cycle = _get_time_ms();
@@ -1045,6 +1047,7 @@ void dlms_emu_process(void)
 			uc_step_cycling = 0;
 			st_sort_cycles = SC_CYCLES;
 #ifdef DLMS_DEBUG_CONSOLE
+			uint16_t i;
 			printf("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes);
 			for(i = 0; i < us_num_registered_nodes; i++) {
 				printf("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address);

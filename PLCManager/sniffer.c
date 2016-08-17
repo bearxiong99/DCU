@@ -10,7 +10,7 @@
 #include "usi_host.h"
 #include "hal_utils.h"
 
-#include "debug.h"
+#include "app_debug.h"
 
 //#define SNIFFER_PROTOCOL_IN_USE            0x13  //PROTOCOL_SNIF_PRIME
 #define SNIFFER_PROTOCOL_IN_USE            0x23  //PROTOCOL_SNIF_G3

@@ -114,6 +114,17 @@ bool is_null_address(uint8_t * puc_extended_address){
  */
 uint16_t get_lbds_count(void)
 {
+	uint16_t lbd_count, us_idx;
+
+	lbd_count = 0;
+	for (us_idx = 0; us_idx < MAX_LBDS; us_idx++) {
+		if (!(is_null_address(g_lbds_list[us_idx].puc_extended_address))){
+			lbd_count++;
+		}
+	}
+
+	return lbd_count;
+
 	return g_lbds_counter;
 }
 
@@ -492,7 +503,7 @@ void set_psk(uint8_t *puc_new_psk)
 void lbp_init_functions(void)
 {
 	uint8_t uc_band_id;
-        struct TAdpMacGetConfirm x_pib_confirm;
+	struct TAdpMacGetConfirm x_pib_confirm;
 
 	g_current_context.currentShortAddr = 0;
 	// The first short address is initially set to 1
@@ -513,7 +524,8 @@ void lbp_init_functions(void)
 	// CHRIS REVIEW : AdpMacGetRequestSync(MAC_PIB_MANUF_BAND_INFORMATION, 0, &x_pib_confirm);
 
 	/* Properly configure IDS according to band */
-	uc_band_id =x_pib_confirm.m_au8AttributeValue[0];
+	//uc_band_id = x_pib_confirm.m_au8AttributeValue[0];
+	uc_band_id = BAND_CENELEC_A;
 
 	if (uc_band_id == BAND_ARIB) {
 		g_IdS.uc_size = NETWORK_ACCESS_IDENTIFIER_MAX_SIZE_S;

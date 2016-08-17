@@ -7,7 +7,7 @@ void usi_host_init()
 {
 	hal_usi_init();
 	ifaceAdp_api_init();
-	sniffer_init();
+	ifaceSniffer_init();
 }
 
 int usi_host_open(char *sz_tty_name, unsigned ui_baudrate)
@@ -42,6 +42,6 @@ void usi_host_select_api(uint8_t app_id)
 
 void usi_host_set_sniffer_cb(void (*sap_handler)(uint8_t* msg, uint16_t len))
 {
-	sniffer_set_cb(sap_handler);
+	ifaceSniffer_set_cb(sap_handler);
 }
 

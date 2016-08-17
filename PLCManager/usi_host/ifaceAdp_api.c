@@ -319,7 +319,7 @@ void AdpLbpRequest(const struct TAdpAddress *pDstAddr, uint16_t u16NsduLength, u
     uint8_t *puc_msg;
     uint8_t uc_len_addr;
 
-    uc_len_addr = sizeof(const struct TAdpAddress);
+    uc_len_addr = sizeof(pDstAddr->m_ExtendedAddress.m_au8Value);
 
     /* Insert parameters */
     puc_msg = spuc_serial_buf;
@@ -333,7 +333,7 @@ void AdpLbpRequest(const struct TAdpAddress *pDstAddr, uint16_t u16NsduLength, u
     *puc_msg++ = uc_len_addr;
     *puc_msg++ = (uint8_t)(u16NsduLength >> 8);
     *puc_msg++ = (uint8_t)u16NsduLength;
-    memcpy(puc_msg, pDstAddr, uc_len_addr);
+    memcpy(puc_msg, pDstAddr->m_ExtendedAddress.m_au8Value, uc_len_addr);
     puc_msg += uc_len_addr;
     memcpy(puc_msg, pNsdu, u16NsduLength);
     puc_msg += u16NsduLength;
@@ -394,6 +394,7 @@ uint8_t _adp_data_ind(uint8_t* ptrMsg, uint16_t len)
 	} else {
 		memcpy(spuc_serial_buf, ptr_info, data_ind.m_u16NsduLength);
 	}
+	data_ind.m_pNsdu = spuc_serial_buf;
 
     if (sx_g3_adp_api.fnctAdpDataIndication) {
     	sx_g3_adp_api.fnctAdpDataIndication(&data_ind);

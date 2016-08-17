@@ -30,7 +30,7 @@
 #include "socket_handler.h"
 #include "plcmanager.h"
 #include "app_adp_mng.h"
-#include "debug.h"
+#include "app_debug.h"
 #include "http_mng.h"
 #include "sniffer.h"
 #include "usi_host.h"
@@ -45,84 +45,6 @@ typedef struct {
 /* Manage Callbacks of applications */
 static pf_app_callback_t app_cbs[PLC_MNG_MAX_APP_ID];
 
-static int _getParseInt(char * _szStr, int *_iVal)
-{
-	char *endptr;
-	long tmp;
-
-	errno = 0;    /* To distinguish success/failure after call */
-	tmp = strtol(_szStr, &endptr, 10);
-
-	/* Check for various possible errors */
-	if ((errno == ERANGE && (tmp == LONG_MAX || tmp == LONG_MIN))
-	                   || (errno != 0 && tmp == 0))
-	{
-	    return -1;
-	}
-
-	if (endptr == _szStr)
-	{
-	    return -1;
-	}
-
-	/* If we got here, strtol() successfully parsed a number */
-    *_iVal = (int) tmp;
-
-    return 0;
-}
-
-static int _parse_arguments(int argc, char** argv, x_serial_args_t *serial_args)
-{
-	int c;
-
-	while (1)
-	{
-		static struct option long_options[] = {
-	    		{"tty",      required_argument, 0, 't'},
-	    		{"baudrate", required_argument, 0, 'b'},
-	    		{0, 0, 0, 0}
-	   };
-
-		/* getopt_long stores the option index here. */
-	   int option_index = 0;
-
-	   c = getopt_long (argc, argv, "t:b", long_options, &option_index);
-
-	   /* Detect the end of the options. */
-	   if (c == -1) {
-		   break;
-	   }
-
-	   switch (c)
-	   {
-	   	   case 0:
-	   		   /* If this option set a flag, do nothing else now. */
-	           if (long_options[option_index].flag != 0) {
-	        	   break;
-	           }
-	           break;
-
-	   		case 'b':
-	   			if(_getParseInt(optarg,(int*)&serial_args->ui_baudrate) != 0) {
-	   		   		return -1;
-	   		   	}
-	   		   	break;
-
-	   		case 't':
-	   			strncpy(serial_args->sz_tty_name, optarg, 255);
-	   			break;
-
-	   		case 'h':
-	   		case '?':
-	   			/* getopt_long already printed an error message. */
-	   			return -1;
-	   			break;
-           }
-    }
-	return 0;
-}
-
-
 int main(int argc, char** argv)
 {
 	socket_res_t i_socket_res;
@@ -130,22 +52,13 @@ int main(int argc, char** argv)
 #if BOARD == BOARD_SAMA5EK
 	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200};
 #elif BOARD == BOARD_ARIA
-	x_serial_args_t serial_args = {"/dev/ttyS0", 115200};
+	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200}; //{"/dev/ttyS0", 115200};
 #else
 	error No board defined
 #endif
 
 
 	PRINTF_INIT();
-
-	/* Load command line parameters */
-	if (_parse_arguments(argc,argv, &serial_args) < 0) {
-		PRINTF("PLC Manager v%d,%d\n", PLC_MNG_VERSION_HI, PLC_MNG_VERSION_LO);
-		PRINTF("Error, check arguments.\n");
-		PRINTF("\t-t tty                : tty device connecting to a base node, default: /dev/ttyUSB0 \n");
-		PRINTF("\t-b baudrate           : tty baudrate configuration, default: 115200\n");
-		exit(-1);
-	}
 
 	/* Init callbacks for applications */
 	memset(&app_cbs, 0, sizeof(app_cbs));

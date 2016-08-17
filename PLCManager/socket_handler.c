@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "debug.h"
+#include "app_debug.h"
 #include "errno.h"
 #include "socket_handler.h"
 

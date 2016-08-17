@@ -50,5 +50,8 @@
 /* Maximum number of devices that can join the network */
 #define MAX_LBDS                                2000
 
+/* Maximum number of hops */
+#define MAX_HOPS                                10
+
 #endif  /* CONF_BS_H_INCLUDE */
 

@@ -11,7 +11,7 @@
 /* #define DLMS_EMU_DISABLE_CYCLES */
 
 /* Enable DLMS EMU path request. PREQ will request to nodes always before launch next cycle */
-/* #define DLMS_EMU_ENABLE_PATH_REQ */
+#define DLMS_EMU_ENABLE_PATH_REQ
 
 
 /* --- DEFINE APP REPORT TYPES --- */
@@ -78,7 +78,7 @@ typedef struct x_node_list{
 	uint8_t puc_extended_address[8];
 } x_node_list_t;
 
-void dlms_emu_init(void);
+void dlms_emu_init(uint8_t *puc_ext_addr);
 void dlms_emu_update(void);
 void dlms_emu_process(void);
 void dlms_emu_join_node(uint8_t *puc_extended_address, uint16_t us_short_address);

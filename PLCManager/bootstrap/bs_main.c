@@ -71,7 +71,7 @@ static void _rekeying_process(void)
 		      GetLength(),                               /* NSDU length */
 		      GetData(),                                 /* NSDU */
 		      uc_nsdu_handle++,                          /* NSDU handle */
-		      getConfirm.m_au8AttributeValue[0],         /* Max. Hops */
+			  MAX_HOPS, //getConfirm.m_au8AttributeValue[0],         /* Max. Hops */
 		      true,                                      /* Discover route */
 		      0,                                         /* QoS */
 		      false);                                    /* Security enable */
@@ -111,7 +111,7 @@ static void AdpNotification_LbpIndication(struct TAdpLbpIndication *pLbpIndicati
 			      GetLength(),                              /* NSDU length */
 			      GetData(),                                /* NSDU */
 			      uc_nsdu_handle++,                         /* NSDU handle */
-			      getConfirm.m_au8AttributeValue[0],        /* Max. Hops */
+				  MAX_HOPS, //getConfirm.m_au8AttributeValue[0],        /* Max. Hops */
 			      true,                                     /* Discover route */
 			      0,                                        /* QoS */
 			      false);                                   /* Security enable */
@@ -258,7 +258,7 @@ void bs_lbp_kick_device(uint16_t us_short_address)
 				      g_us_length,                              /* NSDU length */
 				      g_puc_data,                               /* NSDU */
 				      uc_nsdu_handle++,                         /* NSDU handle */
-				      getConfirm.m_au8AttributeValue[0],        /* Max. Hops */
+					  MAX_HOPS, //getConfirm.m_au8AttributeValue[0],        /* Max. Hops */
 				      true,                                     /* Discover route */
 				      0,                                        /* QoS */
 				      false);                                   /* Security enable */
