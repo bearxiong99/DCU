@@ -157,7 +157,9 @@
 #define MDNS_CLIENT_SUPPORT DISABLED
 
 /* Buffer size for PLC application */
-#define NET_MEM_POOL_BUFFER_SIZE 128
+#define NET_MEM_POOL_BUFFER_SIZE 1536
+/* Num of buffers for PLC application */
+#define NET_MEM_POOL_BUFFER_COUNT 4
 
 /* Enable Static Memory Pool for PLC application */
 #define NET_MEM_POOL_SUPPORT  ENABLED

@@ -29,6 +29,7 @@
 									<listOptionValue builtIn="false" value=".."/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/g3_inc}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/common}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/atpl_extension}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/cyclone_tcp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/ipv6/module_config}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/utils}&quot;"/>

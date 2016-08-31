@@ -84,9 +84,8 @@ static void SetConfirm(uint8_t u8Status, uint32_t u32AttributeId, uint16_t u16At
 				if (g_u8MibInitIndex == g_u8MibTableSize) {
 					// Stop
 					b_send_pib = false;
-#ifdef DLMS_REPORT
-					printf("Modem fully initialized.\r\n");
-#endif
+					LOG_APP_DEBUG(("Modem fully initialized.\r\n"));
+
 				}
 			} else {
 				LOG_APP_DEBUG(("ERR[AppAdpSetConfirm] Invalid SetConfirm received during initialization. Expecting 0x%08X/%u but received 0x%08X/%u\r\n",

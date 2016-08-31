@@ -124,8 +124,6 @@ uint16_t get_lbds_count(void)
 	}
 
 	return lbd_count;
-
-	return g_lbds_counter;
 }
 
 /**

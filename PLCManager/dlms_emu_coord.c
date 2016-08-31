@@ -54,11 +54,26 @@
 #include "dlms_emu_coord.h"
 #include "app_adp_mng.h"
 #include "Config.h"
-
-#define DLMS_DEBUG_CONSOLE
+#include "async_ping.h"
 
 #define UNUSED(v)                  (void)(v)
 #define ADP_PATH_METRIC_TYPE       0
+
+#define DLMS_REPORT_CONSOLE
+#define DLMS_DEBUG_CONSOLE
+
+#ifdef DLMS_DEBUG_CONSOLE
+#	define LOG_APP_DEBUG(a)   printf a
+#else
+#	define LOG_APP_DEBUG(a)   (void)0
+#endif
+
+
+#ifdef DLMS_REPORT_CONSOLE
+#	define LOG_APP_REPORT(a)   printf a
+#else
+#	define LOG_APP_REPORT(a)   (void)0
+#endif
 
 typedef struct x_cycles_stat {
 	uint32_t ul_success;
@@ -174,9 +189,22 @@ static uint32_t ul_timer_max_to_req_paths;
 static struct TAdpPathDiscoveryConfirm sx_path_nodes[DLMS_MAX_DEV_NUM];
 #endif
 
-static bool sb_send_ping;
-static uint32_t sul_ping_dev_idx;
+#ifdef DLMS_EMU_ENABLE_PING_CYCLE
 
+typedef struct _ping_cycle_node_stats {
+	uint32_t ul_pings_sent;
+	uint32_t ul_pings_successful;
+	uint32_t ul_ping_errors;
+}s_ping_cycle_node_stats_t;
+
+struct s_ping_cycle_status_t {
+	s_ping_cycle_node_stats_t as_ping_cycle_node_stats[DLMS_MAX_DEV_NUM];
+	uint32_t ul_current_node_ping;
+};
+
+struct s_ping_cycle_status_t s_ping_cycle_status;
+static bool sb_ping_sent;
+#endif
 
 static bool new_cmd;
 static uint8_t uc_lastblock;
@@ -205,6 +233,38 @@ NetInterface *plc_interface = &netInterface[0];
 /* Own Extended Address */
 static uint8_t spuc_extended_address[8];
 
+#ifdef DLMS_EMU_ENABLE_PING_CYCLE
+static void _init_ping_cycle_status_data(void){
+	uint32_t ul_i;
+	s_ping_cycle_status.ul_current_node_ping = 0;
+	for(ul_i = 0 ; ul_i < DLMS_MAX_DEV_NUM; ul_i ++){
+		s_ping_cycle_status.as_ping_cycle_node_stats[ul_i].ul_pings_sent = 0;
+		s_ping_cycle_status.as_ping_cycle_node_stats[ul_i].ul_pings_successful = 0;
+		s_ping_cycle_status.as_ping_cycle_node_stats[ul_i].ul_ping_errors = 0;
+	}
+
+}
+
+static error_t _send_ping_to_dev(uint32_t ul_dev_idx)
+{
+	IpAddr srcIpAddr;
+	error_t x_error;
+
+	/* Set link-local address, based on the PAN_ID and the short address */
+	ipv6StringToAddr(APP_IPV6_GENERIC_LINK_LOCAL_ADDR, &srcIpAddr.ipv6Addr);
+	/* Adapt the IPv6 address to the G3 connection data */
+	srcIpAddr.ipv6Addr.b[8] = (uint8_t) (DLMS_G3_COORD_PAN_ID >> 8);
+	srcIpAddr.ipv6Addr.b[9] = (uint8_t) (DLMS_G3_COORD_PAN_ID);
+	srcIpAddr.ipv6Addr.b[14] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address >> 8);
+	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address);
+	srcIpAddr.length = sizeof(Ipv6Addr);
+
+	x_error = async_ping_send(plc_interface, &srcIpAddr, DLMS_EMU_PING_CYCLE_LEN, DLMS_EMU_PING_CYCLE_TTL, DLMS_EMU_PING_CYCLE_TIMEOUT * 1000);
+	return x_error;
+
+}
+#endif
+
 static uint32_t _get_time_ms()
 {
 	struct timeval time_value;
@@ -227,32 +287,8 @@ static uint32_t _get_time_ms()
 	return ul_res;
 }
 
-#include "core/ping.h"
-static void _send_ping_to_dev(uint32_t ul_dev_idx)
-{
-	IpAddr srcIpAddr;
-	error_t x_error;
-	uint32_t ul_rtt;
 
-	/* Set link-local address, based on the PAN_ID and the short address */
-	ipv6StringToAddr(APP_IPV6_GENERIC_LINK_LOCAL_ADDR, &srcIpAddr.ipv6Addr);
-	/* Adapt the IPv6 address to the G3 connection data */
-	srcIpAddr.ipv6Addr.b[8] = (uint8_t) (DLMS_G3_COORD_PAN_ID >> 8);
-	srcIpAddr.ipv6Addr.b[9] = (uint8_t) (DLMS_G3_COORD_PAN_ID);
-	srcIpAddr.ipv6Addr.b[14] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address >> 8);
-	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address);
-	srcIpAddr.length = sizeof(Ipv6Addr);
-
-	x_error = ping(plc_interface, &srcIpAddr, 10, 5, 10, &ul_rtt);
-
-	if (x_error != NO_ERROR) {
-		printf("[DLMS_EMU] Ping successfull %d\r\n", ul_rtt);
-	}
-
-}
-
-
-#if defined (DLMS_DEBUG_CONSOLE) || defined (DLMS_REPORT)
+#if defined (DLMS_DEBUG_CONSOLE) || defined (DLMS_REPORT_CONSOLE)
 
 static char c_log_full_cycles_time_query[100];
 static char c_log_cycles_step_query[600];
@@ -371,7 +407,7 @@ static void _log_full_cycles_time(uint32_t ul_cycleId, uint32_t ul_cycleTime)
 	sprintf(c_log_full_cycles_time_query, "cycleId: %u cycleTime: %u ul_absolute_time: %u",
 		ul_cycleId, ul_cycleTime, _get_time_ms());
 
-	printf("[DLMS_EMU] Cycle summary: %s\r\n", c_log_full_cycles_time_query);
+	LOG_APP_REPORT(("[DLMS_EMU] Cycle summary: %s\r\n", c_log_full_cycles_time_query));
 
 	/* Summary nodes  */
 	us_node_idx = 0;
@@ -384,8 +420,8 @@ static void _log_full_cycles_time(uint32_t ul_cycleId, uint32_t ul_cycleTime)
 
 		us_node_idx++;
 
-		printf("[DLMS_EMU] %s\r\n", c_log_cycles_step_query);
-		printf("[DLMS_EMU] ------------------------------------------------------------------------------------\r\n");
+		LOG_APP_REPORT(("[DLMS_EMU] %s\r\n", c_log_cycles_step_query));
+		LOG_APP_REPORT(("[DLMS_EMU] ------------------------------------------------------------------------------------\r\n"));
 	}
 }
 
@@ -404,7 +440,7 @@ static void _updatecycle_stat(uint8_t uc_node_idx, uint8_t uc_step, uint8_t uc_e
 static void _log_cycles_step(uint32_t ul_cycleId, uint16_t us_node, uint8_t uc_status, uint8_t uc_step)
 {
 	sprintf(c_log_cycles_step_query, "cycleId: %u, 0x%04x, status: %d, step: %d", ul_cycleId, px_node_list[us_node].us_short_address, uc_status, uc_step);
-	printf("[DLMS_EMU] %s\r\n", c_log_cycles_step_query);
+	LOG_APP_REPORT(("[DLMS_EMU] %s\r\n", c_log_cycles_step_query));
 }
 
 //***********************************************************************************
@@ -423,7 +459,7 @@ static void _print_result_test(uint8_t uc_node_idx, uint8_t uc_step, uint8_t uc_
 
 	/* UPDATE MEAN CYCLE TIME */
 	sx_cycles_stat[uc_node_idx].ul_cmean_time = (sx_cycles_stat[uc_node_idx].ul_cmean_time * (num_cycle - 1) + cTime) / num_cycle;
-	printf("[DLMS_EMU] %s\r\n", c_print_result_test_query);
+	LOG_APP_REPORT(("[DLMS_EMU] %s\r\n", c_print_result_test_query));
 }
 #endif
 /*
@@ -516,33 +552,23 @@ static uint8_t _checkReceivedData(uint8_t uc_step, uint8_t *data)
 	case ASSOCIATION_REQUEST:
 		if (memcmp(data, assoc_response_val, sizeof(assoc_response_val)) == 0) {
 			value = true;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] ASSOCIATION_RESPONSE received\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] ASSOCIATION_RESPONSE received\r\n"));
 		} else {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step);
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step));
 		}
 		break;
 
 	case DATE_REQUEST:
 		if (memcmp(data, get_request_date_val, sizeof(get_request_date_val)) == 0) {
 			value = true;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] DATE_RESPONSE received\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] DATE_RESPONSE received\r\n"));
 		} else {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step);
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step));
 		}
 		break;
 
 	case SO2_REQUEST:
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] SO2_RESPONSE received\r\n");
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] SO2_RESPONSE received\r\n"));
 		value = true;
 		break;
 
@@ -553,31 +579,21 @@ static uint8_t _checkReceivedData(uint8_t uc_step, uint8_t *data)
 				/* last block received */
 				uc_lastblock = 1;
 			}
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] NEXBLOCK_REQUEST received. Last block: %d\r\n", uc_lastblock);
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] NEXBLOCK_REQUEST received. Last block: %d\r\n", uc_lastblock));
 		} else {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step);
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step));
 		}
 		break;
 	case RELEASE_REQUEST:
 		if (memcmp(data, release_response_val, sizeof(release_response_val)) == 0) {
 			value = true;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] RELEASE_RESPONSE received\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] RELEASE_RESPONSE received\r\n"));
 		} else {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step);
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step));
 		}
 		break;
 	default:
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step);
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step));
 		break;
 
 	}
@@ -596,17 +612,13 @@ static uint16_t _generateStr(uint8_t uc_step, uint8_t uc_invoke_order)
 	case ASSOCIATION_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_associationRequest);
 		puc_dlms_message = cmd_DLMS_associationRequest;
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] ASSOCIATION_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address);
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] ASSOCIATION_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
 		break;
 	case DATE_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_date_OBIS0000010000FF_0008_02);
 		puc_dlms_message = cmd_DLMS_date_OBIS0000010000FF_0008_02;
 		cmd_DLMS_date_OBIS0000010000FF_0008_02[2] = uc_invoke_order;
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] DATE_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address);
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] DATE_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
 		break;
 	case SO2_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_S02_OBIS0100630100FF_0007_02);
@@ -614,9 +626,7 @@ static uint16_t _generateStr(uint8_t uc_step, uint8_t uc_invoke_order)
 		cmd_DLMS_S02_OBIS0100630100FF_0007_02[2] = uc_invoke_order + 1;
 		uc_lastblock = 0;
 		uc_blocknumber = 1;
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] S02_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address);
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] S02_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
 		break;
 	case NEXBLOCK_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_NextBlock);
@@ -624,17 +634,13 @@ static uint16_t _generateStr(uint8_t uc_step, uint8_t uc_invoke_order)
 		cmd_DLMS_NextBlock[2] = uc_invoke_order + 1;
 		uc_blocknumber++;
 		cmd_DLMS_NextBlock[6] = uc_blocknumber;
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] NEXBLOCK_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address);
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] NEXBLOCK_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
 		break;
 	case RELEASE_REQUEST:
 	default:
 		ui_lenghtmsg = sizeof(cmd_DLMS_release_request);
 		puc_dlms_message = cmd_DLMS_release_request;
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] RELEASE_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address);
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] RELEASE_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
 		break;
 
 	}
@@ -677,9 +683,8 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 
 	switch (st_execute_cycle) {
 	case SEND:
-#ifdef DLMS_DEBUG_CONSOLE
-		printf("[DLMS_EMU] _execute_cycle: SEND\r\n");
-#endif
+		LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: SEND\r\n"));
+
 		/* Get Initial time to start cycle with new node */
 		if (uc_step == 0) {
 			ul_start_time_node_cycle = _get_time_ms();
@@ -688,21 +693,16 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 		if (px_node_list[us_node].us_short_address == DLMS_INVALID_ADDRESS) {
 			*puc_error = ERROR_NON_CONNECTED_NODE;
 			end = true;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] _execute_cycle: Nothing to send (no connected nodes)\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: Nothing to send (no connected nodes)\r\n"));
+
 		} else {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] _execute_cycle: SEND - sending data...\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: SEND - sending data...\r\n"));
 			us_lenght_msg = _generateStr(uc_step_cycling, 0xc1);
 
 			x_error = socketSendTo(px_udp_plc_socket, &srcIpAddr, us_src_port, pUdpPayload_tx, us_lenght_msg, &act_tx_size, SOCKET_FLAG_WAIT_ALL);
 
 			if(x_error != NO_ERROR) {
-#ifdef DLMS_DEBUG_CONSOLE
-				printf("[DLMS_EMU] Unsuccessful socketSendTo()!\r\n");
-#endif
+				LOG_APP_DEBUG(("[DLMS_EMU] Unsuccessful socketSendTo()!\r\n"));
 			}
 
 			ul_time_out = TIME_OUT_DATA_MSG ;
@@ -714,16 +714,11 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 		if (!ul_time_out) {
 			*puc_error = ERROR_TIMEOUT_DATA_CONFIRM;
 			end = true;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] _execute_cycle: ERROR_TIMEOUT_DATA_CONFIRM\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: ERROR_TIMEOUT_DATA_CONFIRM\r\n"));
 		}
 
 		if (new_cmd) {
-
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: new_cmd RX\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: new_cmd RX\r\n"));
 
 			ul_time_out = TIME_OUT_DATA_MSG ;
 
@@ -736,9 +731,7 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 			}
 			st_execute_cycle = SEND;
 			new_cmd = false;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: Cmd processed. Error: %d\r\n", *puc_error);
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: Cmd processed. Error: %d\r\n", *puc_error));
 		}
 		break;
 
@@ -827,11 +820,9 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	pUdpPayload_rx = (uint8_t *)(puc_rx_buff);
 	pUdpPayload_tx = (uint8_t *)(puc_tx_buff);
 
-#ifdef DLMS_REPORT
-	printf("[DLMS_EMU] ------------ START --------------\r\n");
-	printf("[DLMS_EMU] DLMS EMU Application: COORDINATOR\r\n");
-	printf("[DLMS_EMU] dlms_emu_init: SC_WAIT_START_CYCLES\r\n");
-#endif
+	LOG_APP_REPORT(("[DLMS_EMU] ------------ START --------------\r\n"));
+	LOG_APP_REPORT(("[DLMS_EMU] DLMS EMU Application: COORDINATOR\r\n"));
+	LOG_APP_REPORT(("[DLMS_EMU] dlms_emu_init: SC_WAIT_START_CYCLES\r\n"));
 
 	/* Init local vars */
 	ul_timer_dlms_start_wait = TIMER_WAITING_START;
@@ -852,11 +843,14 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	/* Set Extended Address */
 	memcpy(spuc_extended_address, puc_ext_addr, sizeof(spuc_extended_address));
 
+#ifdef OSS_ENABLE_IPv6_STACK_SUPPORT
 	/* Initialize UDP-IP over G3 */
 	initialize_udp_ip_DC();
-
-	sb_send_ping = 0;
-	sul_ping_dev_idx = 0;
+#endif
+#ifdef DLMS_EMU_ENABLE_PING_CYCLE
+	sb_ping_sent = false;
+	_init_ping_cycle_status_data();
+#endif
 
 	sul_sys_time = time(NULL);
 	gettimeofday(&sx_time_init_value, NULL);
@@ -916,19 +910,57 @@ static void _dlms_emu_update(void)
 void dlms_emu_process(void)
 {
 	uint8_t uc_error;
+	error_t x_error;
+	systime_t roundTripTime;
+	uint32_t i;
 
 	_dlms_emu_update();
 
-	if (sb_send_ping) {
-		sb_send_ping = false;
+#ifdef DLMS_EMU_ENABLE_PING_CYCLE
+       if (sb_ping_sent){
+		x_error = async_ping_rcv( &roundTripTime);
+		if (x_error == ERROR_TIMEOUT){
+			//LOG_APP_DEBUG(("[DLMS_EMU] Ping Process Timeout  Error: %d \r\n", x_error));
+		}else {
+			if(x_error != NO_ERROR) {
+				s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_ping_errors += 1;
+				LOG_APP_REPORT(("[DLMS_EMU] Unsuccessful Ping! to 0x%04x Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address , x_error));
+				sb_ping_sent = 0;
+			}else{
+				s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_successful += 1;
+				LOG_APP_REPORT(("[DLMS_EMU] Ping Successful to 0x%04x! RoundTripTime: %d\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address, roundTripTime));
+				sb_ping_sent = 0;
+			}
 
-		if (sul_ping_dev_idx == us_num_registered_nodes) {
-			sul_ping_dev_idx = 0;
+			s_ping_cycle_status.ul_current_node_ping++;
+
+			if (s_ping_cycle_status.ul_current_node_ping == us_num_registered_nodes) {
+				s_ping_cycle_status.ul_current_node_ping = 0;
+				for(i = 0; i < us_num_registered_nodes; i++){
+					LOG_APP_REPORT(("[DLMS_EMU] Ping Report node 0x%04x  -->  Pings sent: %d  ; Successful Ping: %d; Errors: %d Success Rate : %f\r\n",px_node_list[i].us_short_address, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_ping_errors, (100.0 *(float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful)/((float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent) ));
+				}
+			}
 		}
-
-		_send_ping_to_dev(sul_ping_dev_idx++);
 	}
 
+
+
+	if (!sb_ping_sent) {
+
+		if (us_num_registered_nodes){
+
+			x_error = _send_ping_to_dev(s_ping_cycle_status.ul_current_node_ping);
+			if(x_error == NO_ERROR) {
+			   LOG_APP_REPORT(("\r\n[DLMS_EMU] Ping to 0x%04x Sent ok!\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
+			   s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_sent += 1;
+			   sb_ping_sent = true;
+			}else{
+			   LOG_APP_REPORT(("\r\n[DLMS_EMU] Fail sending Ping to 0x%04x!  Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
+			}
+
+		}
+	}
+#endif
 	if (ul_timer_dlms_start_wait || ul_timer_next_cycle) {
 		return;
 	}
@@ -952,14 +984,12 @@ void dlms_emu_process(void)
 			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
 			if (us_num_registered_nodes) {
-#ifdef DLMS_DEBUG_CONSOLE
 				uint16_t i = 0;
-				printf("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n");
-				printf("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes);
+				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
+				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes));
 				for(i = 0; i < us_num_registered_nodes; i++) {
-					printf("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address);
+					LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address));
 				}
-#endif
 
 #ifdef DLMS_EMU_ENABLE_PATH_REQ
 				/* Get Path Nodes Info */
@@ -976,10 +1006,8 @@ void dlms_emu_process(void)
 				/* Waiting Network Stability */
 				ul_timer_dlms_start_wait = TIMER_WAITING_START;
 #endif
-#ifdef DLMS_DEBUG_CONSOLE
-				printf("\n[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n");
-#endif
-			} else {
+				LOG_APP_DEBUG(("\n[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
+		} else {
 				/* Restart Waiting Timer */
 				ul_timer_dlms_start_wait = TIMER_WAITING_START;
 			}
@@ -992,9 +1020,7 @@ void dlms_emu_process(void)
 #ifdef DLMS_EMU_ENABLE_PATH_REQ
 	case SC_PATH_REQUEST_LIST:
 		if (sb_update_nodes) {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
 			sb_update_nodes = false;
 			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
@@ -1025,13 +1051,8 @@ void dlms_emu_process(void)
 #endif
 
 	case SC_TIME_NEXT_CYCLE:
-#ifdef DLMS_EMU_DISABLE_CYCLES
-			break;
-#else
-			if (sb_update_nodes) {
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n");
-#endif
+		if (sb_update_nodes) {
+			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
 			sb_update_nodes = false;
 			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
@@ -1046,33 +1067,28 @@ void dlms_emu_process(void)
 			us_node_cycling = 0;
 			uc_step_cycling = 0;
 			st_sort_cycles = SC_CYCLES;
-#ifdef DLMS_DEBUG_CONSOLE
-			uint16_t i;
-			printf("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes);
+
+			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes));
 			for(i = 0; i < us_num_registered_nodes; i++) {
-				printf("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address);
+				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address));
 			}
-			printf("\n[DLMS_EMU] dlms_emu_process: SC_CYCLES\r\n");
-#endif
+			LOG_APP_DEBUG(("\n[DLMS_EMU] dlms_emu_process: SC_CYCLES\r\n"));
+
 		} else {
 			/* Restart Waiting Timer */
 			ul_timer_dlms_start_wait = TIMER_WAITING_START;
 			st_sort_cycles = SC_WAIT_INITIAL_LIST;
 		}
-#endif
 		break;
 
 	case SC_CYCLES:
+#ifdef DLMS_EMU_ENABLE_SHORT_CYCLES
 		if (us_node_cycling < us_num_registered_nodes) {
 			if (_execute_cycle(us_node_cycling, uc_step_cycling, &uc_error)) {
-#ifdef DLMS_REPORT
 				_updatecycle_stat(us_node_cycling, uc_step_cycling, uc_error);
 				_log_cycles_step(ul_cycles_counter, us_node_cycling, uc_error, uc_step_cycling);
-#endif
 				if (uc_error != ERROR_NO_ERROR) {
-#ifdef DLMS_REPORT
 					_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
-#endif
 					uc_step_cycling = 0;
 					us_node_cycling++;
 				} else {
@@ -1081,16 +1097,12 @@ void dlms_emu_process(void)
 					} else {
 						uc_step_cycling++;
 						ul_timer_next_cycle = TIMER_BETWEEN_MESSAGES      ;
-#ifdef DLMS_DEBUG_CONSOLE
-						printf("[DLMS_EMU] dlms_emu_process: Waiting next cycle\r\n");
-#endif
+						LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Waiting next cycle\r\n"));
 					}
 
 					if (uc_step_cycling == NUM_STEPS) {
-#ifdef DLMS_REPORT
 						_log_S02_Status(ul_cycles_counter, us_node_cycling);
 						_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
-#endif
 						uc_step_cycling = 0;
 						us_node_cycling++;
 					}
@@ -1098,23 +1110,21 @@ void dlms_emu_process(void)
 			}
 		} else {
 			ul_total_time_cycle = _get_time_ms() - ul_start_time_cycle;
-#ifdef DLMS_REPORT
 			_log_full_cycles_time(ul_cycles_counter, ul_total_time_cycle);
-#endif
 			ul_cycles_counter++;
-#ifdef DLMS_DEBUG_CONSOLE
-			printf("[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n");
-#endif
+			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
 #ifdef DLMS_EMU_ENABLE_PATH_REQ
 			/* Get Path Nodes Info before each complete cycle */
 			us_num_path_nodes = 0;
 			st_sort_cycles = SC_PATH_REQUEST_LIST;
 #else
 			/* Next Cycles */
+			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 			st_sort_cycles = SC_TIME_NEXT_CYCLE;
 			ul_timer_next_cycle = TIMER_BETWEEN_CYCLES;
 #endif
 		}
+#endif
 		break;
 	}
 }
