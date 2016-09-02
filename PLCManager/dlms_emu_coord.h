@@ -13,9 +13,9 @@
 /**** Enable Short Cycles ****/
 #define DLMS_EMU_ENABLE_SHORT_CYCLES
 /**** Enable DLMS EMU path request. PREQ will request to nodes always before launch next cycle ****/
-/* #define DLMS_EMU_ENABLE_PATH_REQ */
+#define DLMS_EMU_ENABLE_PATH_REQ
 /**** Ping Cycle Configuration ****/
-#define DLMS_EMU_ENABLE_PING_CYCLE
+//#define DLMS_EMU_ENABLE_PING_CYCLE
 
 /* Build a JSON object with Network Topology and send it through Serial port */
 /* #define JSON_ENABLE */

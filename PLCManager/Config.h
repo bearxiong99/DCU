@@ -3,6 +3,9 @@
 
 #include "conf_bs.h"
 
+/* Enable IPv6 stack */
+#define OSS_ENABLE_IPv6_STACK_SUPPORT
+
 /* Port number for the application */
 #define APP_SOCKET_PORT 0xF0B1
 
