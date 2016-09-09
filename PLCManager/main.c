@@ -80,12 +80,12 @@ int main(int argc, char** argv)
 		exit(-1);
 	}
 
-//	/* Open HTTP internal NODE server socket */
-//	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_LOOPBACK, PLC_MNG_HTTP_MNG_APP_PORT);
-//	if (i_socket_res == SOCKET_ERROR) {
-//		PRINTF("Cannot open HTTP internal NODE Server socket.");
-//		exit(-1);
-//	}
+	/* Open HTTP internal NODE server socket */
+	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_ANY, PLC_MNG_HTTP_MNG_APP_PORT);
+	if (i_socket_res == SOCKET_ERROR) {
+		PRINTF("Cannot open HTTP internal NODE Server socket.");
+		exit(-1);
+	}
 
 	/* USI_HOST serial connection. */
 	usi_host_init();
@@ -108,10 +108,10 @@ int main(int argc, char** argv)
 	/* Init CLI app */
 	adp_mng_init(PLC_MNG_DLMS_APP_ID);
 
-//	/* Register HTTP internal NODE APP callback */
-//	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
-//	/* Init HTTP client manager to connect with NODE server */
-//	http_mng_init();
+	/* Register HTTP internal NODE APP callback */
+	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
+	/* Init HTTP client manager to connect with NODE server */
+	http_mng_init();
 
 	while(1) {
 		int i_res;
@@ -141,9 +141,6 @@ int main(int argc, char** argv)
 						/* Process USI */
 						usi_host_process();
 						adp_mng_process();
-//					} else if (socket_evet_info.i_app_id == PLC_MNG_HTTP_MNG_APP_ID) {
-//						/* Process HTTP manager (node js) */
-//						http_mng_process();
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {

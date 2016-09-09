@@ -365,6 +365,9 @@ void adp_mng_init(int _app_id)
 {
 	si_app_adp_id = _app_id;
 
+	/* Init os port (timers) */
+	osInitKernel();
+
 	/* Init modules */
 	InitializeStack();
 

@@ -5,23 +5,20 @@
 
 /* --- DEFINE APP BEHAVIOUR --- */
 /* Adapt DLMS EMU start cycles dynamically to network stability. Always before the TIMER_WAITING_START has expired */
-#define DLMS_EMU_WAIT_REG_NODES
+//#define DLMS_EMU_WAIT_REG_NODES
 
 
 /**************** App feature habilitation ************************/
 
 /**** Enable Short Cycles ****/
-#define DLMS_EMU_ENABLE_SHORT_CYCLES
+//#define DLMS_EMU_ENABLE_SHORT_CYCLES
 /**** Enable DLMS EMU path request. PREQ will request to nodes always before launch next cycle ****/
-#define DLMS_EMU_ENABLE_PATH_REQ
+//#define DLMS_EMU_ENABLE_PATH_REQ
 /**** Ping Cycle Configuration ****/
 //#define DLMS_EMU_ENABLE_PING_CYCLE
 
 /* Build a JSON object with Network Topology and send it through Serial port */
-/* #define JSON_ENABLE */
-
-/* Activate DLMS debug */
-/* #define DLMS_DEBUG_CONSOLE */
+#define JSON_ENABLE
 
 
 /* --- DEFINE APP LENGTHS --- */
@@ -42,16 +39,16 @@
 /* Ping Cycle Period */
 #define DLMS_EMU_PING_CYCLE_TIMER_INTERVAL       3
 /* Ping Cycle Timeout for response */
-#define DLMS_EMU_PING_CYCLE_TIMEOUT              60
+//#define DLMS_EMU_PING_CYCLE_TIMEOUT              60
 /* Ping Cycle Time to live */
-#define DLMS_EMU_PING_CYCLE_TTL                  10
+//#define DLMS_EMU_PING_CYCLE_TTL                  10
 /* Ping Cycle Msg Lenght */
-#define DLMS_EMU_PING_CYCLE_LEN                  10
+//#define DLMS_EMU_PING_CYCLE_LEN                  10
 
 
 /* --- DEFINE APP DLMS OPTIONS --- */
 /* Define load curve lenght in the dlms query */
-#define S02_NUMBEROFDAYS                      1
+//#define S02_NUMBEROFDAYS                      1
 
 /* Max Number of devices defined by Bootstrap module */
 #define DLMS_MAX_DEV_NUM                      G3_MAX_DEV
@@ -67,22 +64,22 @@
 
 /* --- DEFINE APP TIMERS --- */
 /* Time between cycles in SECONDS */
-#define TIMER_BETWEEN_CYCLES                  20
+//#define TIMER_BETWEEN_CYCLES                  20
 
 /* Timeout for messages in SECONDS */
-#define TIME_OUT_DATA_MSG                     50
+//#define TIME_OUT_DATA_MSG                     50
 
 /* Time between messages in SECONDS */
-#define TIMER_BETWEEN_MESSAGES                1
+//#define TIMER_BETWEEN_MESSAGES                1
 
 /* Time to wait before start cycling in SECONDS (approx. 60 sec per device) */
-#define TIMER_WAITING_START                   120 /* 2 minutes */
+//#define TIMER_WAITING_START                   12000 /* 2 minutes */
 
 /* Time max PATH REQ cfm in SECONDS (only in case of uncomment DLMS_EMU_ENABLE_PATH_REQ) */
-#define TIME_MAX_WAIT_PREQ_CFM                120 /* 2 min */
+//#define TIME_MAX_WAIT_PREQ_CFM                120 /* 2 min */
 
 /* Time max Path request process in SECONDS (only in case of uncomment DLMS_EMU_ENABLE_PATH_REQ) */
-#define TIME_MAX_BETWEEN_PREQ_WITOUT_DATA     60 /* 1 min */
+//#define TIME_MAX_BETWEEN_PREQ_WITOUT_DATA     60 /* 1 min */
 
 
 typedef struct x_node_list{

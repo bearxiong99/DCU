@@ -129,6 +129,25 @@ enum {
 /* Configure Number of steps and lengths */
 #define NUM_STEPS	5
 
+/* Configure Application Behaviour */
+static bool sb_enable_wait_reg_nodes;
+static bool sb_enable_dlms_cycles;
+static bool sb_enable_ping_cycles;
+static bool sb_enable_preq_cycles;
+
+static uint32_t sul_ping_cycle_time;
+static uint32_t sul_ping_cycle_timeout;
+static uint32_t sul_ping_cycle_ttl;
+static uint32_t sul_ping_cycle_len;
+
+static uint32_t sul_dlms_numdays_cycles;
+static uint32_t sul_dlms_time_between_cycles;
+static uint32_t sul_dlms_time_out_data_cycles;
+static uint32_t sul_dlms_time_between_msg;
+static uint32_t sul_dlms_time_waiting_start;
+static uint32_t sul_dlms_time_wait_preq_cfm;
+static uint32_t sul_dlms_time_between_preq_no_dlms;
+
 /* standard low security level association request */
 uint8_t cmd_DLMS_associationRequest[] =
 {
@@ -159,7 +178,7 @@ uint8_t cmd_DLMS_S02_OBIS0100630100FF_0007_02[] =
 	0X00, 0X00, 0X01, 0X00, 0X00, 0XFF,
 	0X0F, 0X02, 0X12, 0X00, 0X00, 0X09, 0X0C,
 	0X07, 0XDE, 0X05, 0X15, 0X01, 0X08, 0X00, 0X00, 0X00, 0X80, 0X00, 0X80, 0X09, 0X0C,
-	0X07, 0XDE, 0X05, (0X15 + S02_NUMBEROFDAYS), 0X02, 0X08, 0X00, 0X00, 0X00, 0X80, 0X00, 0X80, 0X01, 0X00
+	0X07, 0XDE, 0X05, 0X15, 0X02, 0X08, 0X00, 0X00, 0X00, 0X80, 0X00, 0X80, 0X01, 0X00
 };
 /*next block request */
 uint8_t cmd_DLMS_NextBlock[] = {0xC0, 0x02, 0xC2, 0x00, 0x00, 0x00, 0x02};
@@ -182,14 +201,12 @@ static uint16_t us_node_cycling;
 static uint8_t uc_step_cycling;
 static uint32_t ul_timer_next_cycle;
 static uint32_t ul_time_out;
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
+
 static uint16_t us_num_path_nodes;
 static uint32_t ul_timer_wait_path_cfm;
 static uint32_t ul_timer_max_to_req_paths;
 static struct TAdpPathDiscoveryConfirm sx_path_nodes[DLMS_MAX_DEV_NUM];
-#endif
 
-#ifdef DLMS_EMU_ENABLE_PING_CYCLE
 
 typedef struct _ping_cycle_node_stats {
 	uint32_t ul_pings_sent;
@@ -204,7 +221,7 @@ struct s_ping_cycle_status_t {
 
 struct s_ping_cycle_status_t s_ping_cycle_status;
 static bool sb_ping_sent;
-#endif
+
 
 static bool new_cmd;
 static uint8_t uc_lastblock;
@@ -233,7 +250,6 @@ NetInterface *plc_interface = &netInterface[0];
 /* Own Extended Address */
 static uint8_t spuc_extended_address[8];
 
-#ifdef DLMS_EMU_ENABLE_PING_CYCLE
 static void _init_ping_cycle_status_data(void){
 	uint32_t ul_i;
 	s_ping_cycle_status.ul_current_node_ping = 0;
@@ -259,11 +275,10 @@ static error_t _send_ping_to_dev(uint32_t ul_dev_idx)
 	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address);
 	srcIpAddr.length = sizeof(Ipv6Addr);
 
-	x_error = async_ping_send(plc_interface, &srcIpAddr, DLMS_EMU_PING_CYCLE_LEN, DLMS_EMU_PING_CYCLE_TTL, DLMS_EMU_PING_CYCLE_TIMEOUT * 1000);
+	x_error = async_ping_send(plc_interface, &srcIpAddr, sul_ping_cycle_len, sul_ping_cycle_ttl, sul_ping_cycle_timeout * 1000);
 	return x_error;
 
 }
-#endif
 
 static uint32_t _get_time_ms()
 {
@@ -705,7 +720,7 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 				LOG_APP_DEBUG(("[DLMS_EMU] Unsuccessful socketSendTo()!\r\n"));
 			}
 
-			ul_time_out = TIME_OUT_DATA_MSG ;
+			ul_time_out = sul_dlms_time_out_data_cycles ;
 			st_execute_cycle = WAIT_DATA_CONFIRM;
 		}
 		break;
@@ -720,7 +735,7 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 		if (new_cmd) {
 			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: new_cmd RX\r\n"));
 
-			ul_time_out = TIME_OUT_DATA_MSG ;
+			ul_time_out = sul_dlms_time_out_data_cycles ;
 
 			if (_checkReceivedData(uc_step, pUdpPayload_rx) == true) {
 				*puc_error = ERROR_NO_ERROR;
@@ -805,6 +820,24 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 {
 	//struct TAdpMacGetConfirm getConfirm;
 
+	/* Default behaviour variables (timers in seconds) */
+	sb_enable_wait_reg_nodes = true;
+	sb_enable_dlms_cycles = false;
+	sb_enable_ping_cycles = false;
+	sb_enable_preq_cycles = false;
+	sul_ping_cycle_time = 3;
+	sul_ping_cycle_timeout = 60;
+	sul_ping_cycle_ttl = 10;
+	sul_ping_cycle_len = 10;
+	sul_dlms_numdays_cycles = 1;
+	cmd_DLMS_S02_OBIS0100630100FF_0007_02[53] += sul_dlms_numdays_cycles;
+	sul_dlms_time_between_cycles = 20;
+	sul_dlms_time_out_data_cycles = 50;
+	sul_dlms_time_between_msg = 1;
+	sul_dlms_time_waiting_start = 12000;
+	sul_dlms_time_wait_preq_cfm = 120;
+	sul_dlms_time_between_preq_no_dlms = 60;
+
 	/* Init variables and status */
 	st_sort_cycles = SC_WAIT_INITIAL_LIST;
 	st_registered_nodes = RN_INITIAL_STATE;
@@ -825,7 +858,7 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	LOG_APP_REPORT(("[DLMS_EMU] dlms_emu_init: SC_WAIT_START_CYCLES\r\n"));
 
 	/* Init local vars */
-	ul_timer_dlms_start_wait = TIMER_WAITING_START;
+	ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 	ul_timer_next_cycle = 0;
 	ul_time_out = 0;
 	sb_update_nodes = false;
@@ -833,24 +866,19 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	ul_cycles_counter = 1;
 	ul_total_time_cycle = 0;
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
 	us_num_path_nodes = 0;
 	memset(sx_path_nodes, 0, sizeof(sx_path_nodes));
 	ul_timer_wait_path_cfm = 0;
-	ul_timer_max_to_req_paths = TIME_MAX_BETWEEN_PREQ_WITOUT_DATA;
-#endif
+	ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
 
 	/* Set Extended Address */
 	memcpy(spuc_extended_address, puc_ext_addr, sizeof(spuc_extended_address));
 
-#ifdef OSS_ENABLE_IPv6_STACK_SUPPORT
 	/* Initialize UDP-IP over G3 */
 	initialize_udp_ip_DC();
-#endif
-#ifdef DLMS_EMU_ENABLE_PING_CYCLE
+
 	sb_ping_sent = false;
 	_init_ping_cycle_status_data();
-#endif
 
 	sul_sys_time = time(NULL);
 	gettimeofday(&sx_time_init_value, NULL);
@@ -894,10 +922,11 @@ static void _dlms_emu_update(void)
 		_update_counter(&ul_timer_dlms_start_wait, ul_time_diff);
 		_update_counter(&ul_timer_next_cycle, ul_time_diff);
 		_update_counter(&ul_time_out, ul_time_diff);
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-		_update_counter(&ul_timer_wait_path_cfm, ul_time_diff);
-		_update_counter(&ul_timer_max_to_req_paths, ul_time_diff);
-#endif
+
+		if (sb_enable_preq_cycles) {
+			_update_counter(&ul_timer_wait_path_cfm, ul_time_diff);
+			_update_counter(&ul_timer_max_to_req_paths, ul_time_diff);
+		}
 
 	}
 }
@@ -916,66 +945,64 @@ void dlms_emu_process(void)
 
 	_dlms_emu_update();
 
-#ifdef DLMS_EMU_ENABLE_PING_CYCLE
-       if (sb_ping_sent){
-		x_error = async_ping_rcv( &roundTripTime);
-		if (x_error == ERROR_TIMEOUT){
-			//LOG_APP_DEBUG(("[DLMS_EMU] Ping Process Timeout  Error: %d \r\n", x_error));
-		}else {
-			if(x_error != NO_ERROR) {
-				s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_ping_errors += 1;
-				LOG_APP_REPORT(("[DLMS_EMU] Unsuccessful Ping! to 0x%04x Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address , x_error));
-				sb_ping_sent = 0;
-			}else{
-				s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_successful += 1;
-				LOG_APP_REPORT(("[DLMS_EMU] Ping Successful to 0x%04x! RoundTripTime: %d\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address, roundTripTime));
-				sb_ping_sent = 0;
-			}
+	if (sb_enable_ping_cycles) {
+		if (sb_ping_sent) {
+			x_error = async_ping_rcv( &roundTripTime);
 
-			s_ping_cycle_status.ul_current_node_ping++;
+			if (x_error == ERROR_TIMEOUT) {
+				//LOG_APP_DEBUG(("[DLMS_EMU] Ping Process Timeout  Error: %d \r\n", x_error));
+			} else {
+				if(x_error != NO_ERROR) {
+					s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_ping_errors += 1;
+					LOG_APP_REPORT(("[DLMS_EMU] Unsuccessful Ping! to 0x%04x Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address , x_error));
+					sb_ping_sent = 0;
+				} else {
+					s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_successful += 1;
+					LOG_APP_REPORT(("[DLMS_EMU] Ping Successful to 0x%04x! RoundTripTime: %d\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address, roundTripTime));
+					sb_ping_sent = 0;
+				}
 
-			if (s_ping_cycle_status.ul_current_node_ping == us_num_registered_nodes) {
-				s_ping_cycle_status.ul_current_node_ping = 0;
-				for(i = 0; i < us_num_registered_nodes; i++){
-					LOG_APP_REPORT(("[DLMS_EMU] Ping Report node 0x%04x  -->  Pings sent: %d  ; Successful Ping: %d; Errors: %d Success Rate : %f\r\n",px_node_list[i].us_short_address, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_ping_errors, (100.0 *(float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful)/((float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent) ));
+				s_ping_cycle_status.ul_current_node_ping++;
+
+				if (s_ping_cycle_status.ul_current_node_ping == us_num_registered_nodes) {
+					s_ping_cycle_status.ul_current_node_ping = 0;
+					for(i = 0; i < us_num_registered_nodes; i++){
+						LOG_APP_REPORT(("[DLMS_EMU] Ping Report node 0x%04x  -->  Pings sent: %d  ; Successful Ping: %d; Errors: %d Success Rate : %f\r\n",px_node_list[i].us_short_address, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_ping_errors, (100.0 *(float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful)/((float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent) ));
+					}
 				}
 			}
 		}
-	}
 
+		if (!sb_ping_sent) {
+			if (us_num_registered_nodes){
+				x_error = _send_ping_to_dev(s_ping_cycle_status.ul_current_node_ping);
+				if (x_error == NO_ERROR) {
+				   LOG_APP_REPORT(("\r\n[DLMS_EMU] Ping to 0x%04x Sent ok!\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
+				   s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_sent += 1;
+				   sb_ping_sent = true;
+				} else {
+				   LOG_APP_REPORT(("\r\n[DLMS_EMU] Fail sending Ping to 0x%04x!  Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
+				}
 
-
-	if (!sb_ping_sent) {
-
-		if (us_num_registered_nodes){
-
-			x_error = _send_ping_to_dev(s_ping_cycle_status.ul_current_node_ping);
-			if(x_error == NO_ERROR) {
-			   LOG_APP_REPORT(("\r\n[DLMS_EMU] Ping to 0x%04x Sent ok!\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
-			   s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_sent += 1;
-			   sb_ping_sent = true;
-			}else{
-			   LOG_APP_REPORT(("\r\n[DLMS_EMU] Fail sending Ping to 0x%04x!  Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
 			}
-
 		}
 	}
-#endif
+
 	if (ul_timer_dlms_start_wait || ul_timer_next_cycle) {
 		return;
 	}
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-	if (ul_timer_wait_path_cfm) {
-		return;
-	}
+	if (sb_enable_preq_cycles) {
+		if (ul_timer_wait_path_cfm) {
+			return;
+		}
 
-	if (ul_timer_max_to_req_paths == 0) {
-		/* Set status to SC_PATH_REQUEST_LIST */
-		us_num_path_nodes = 0;
-		st_sort_cycles = SC_PATH_REQUEST_LIST;
+		if (ul_timer_max_to_req_paths == 0) {
+			/* Set status to SC_PATH_REQUEST_LIST */
+			us_num_path_nodes = 0;
+			st_sort_cycles = SC_PATH_REQUEST_LIST;
+		}
 	}
-#endif
 
 	switch (st_sort_cycles) {
 	case SC_WAIT_INITIAL_LIST:
@@ -991,43 +1018,46 @@ void dlms_emu_process(void)
 					LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address));
 				}
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-				/* Get Path Nodes Info */
-				us_num_path_nodes = 0;
-				st_sort_cycles = SC_PATH_REQUEST_LIST;
-#else
-				/* Start Cycles */
-				st_sort_cycles = SC_TIME_NEXT_CYCLE;
-#endif
+				if (sb_enable_preq_cycles) {
+					/* Get Path Nodes Info */
+					us_num_path_nodes = 0;
+					st_sort_cycles = SC_PATH_REQUEST_LIST;
+				} else {
+					/* Start Cycles */
+					st_sort_cycles = SC_TIME_NEXT_CYCLE;
+				}
+
 				/* Init Cycles Variables */
 				ul_cycles_counter = 1;
 				ul_total_time_cycle = 0;
-#ifdef DLMS_EMU_WAIT_REG_NODES
-				/* Waiting Network Stability */
-				ul_timer_dlms_start_wait = TIMER_WAITING_START;
-#endif
+
+				if (sb_enable_wait_reg_nodes) {
+					/* Waiting Network Stability */
+					ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+				}
+
 				LOG_APP_DEBUG(("\n[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
 		} else {
 				/* Restart Waiting Timer */
-				ul_timer_dlms_start_wait = TIMER_WAITING_START;
+				ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 			}
 		} else {
 			/* Restart Waiting Timer */
-			ul_timer_dlms_start_wait = TIMER_WAITING_START;
+			ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 		}
 		break;
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
 	case SC_PATH_REQUEST_LIST:
 		if (sb_update_nodes) {
 			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
 			sb_update_nodes = false;
 			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
-#ifdef DLMS_EMU_WAIT_REG_NODES
-			ul_timer_dlms_start_wait = TIMER_WAITING_START;
+			if (sb_enable_wait_reg_nodes) {
+				ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+			}
 			break;
-#endif
+
 		}
 
 		if (us_num_registered_nodes == us_num_path_nodes) {
@@ -1042,13 +1072,12 @@ void dlms_emu_process(void)
 #endif
 			/* Start Cycles */
 			st_sort_cycles = SC_TIME_NEXT_CYCLE;
-			ul_timer_next_cycle = TIMER_BETWEEN_CYCLES;
+			ul_timer_next_cycle = sul_dlms_time_between_cycles;
 		} else {
-			ul_timer_wait_path_cfm = TIME_MAX_WAIT_PREQ_CFM;
+			ul_timer_wait_path_cfm = sul_dlms_time_wait_preq_cfm;
 			AdpPathDiscoveryRequest(px_node_list[us_num_path_nodes].us_short_address, ADP_PATH_METRIC_TYPE);
 		}
 		break;
-#endif
 
 	case SC_TIME_NEXT_CYCLE:
 		if (sb_update_nodes) {
@@ -1056,10 +1085,10 @@ void dlms_emu_process(void)
 			sb_update_nodes = false;
 			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
 
-#ifdef DLMS_EMU_WAIT_REG_NODES
-			ul_timer_dlms_start_wait = TIMER_WAITING_START;
-			break;
-#endif
+			if (sb_enable_wait_reg_nodes) {
+				ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+				break;
+			}
 		}
 
 		if (us_num_registered_nodes) {
@@ -1076,55 +1105,56 @@ void dlms_emu_process(void)
 
 		} else {
 			/* Restart Waiting Timer */
-			ul_timer_dlms_start_wait = TIMER_WAITING_START;
+			ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 			st_sort_cycles = SC_WAIT_INITIAL_LIST;
 		}
 		break;
 
 	case SC_CYCLES:
-#ifdef DLMS_EMU_ENABLE_SHORT_CYCLES
-		if (us_node_cycling < us_num_registered_nodes) {
-			if (_execute_cycle(us_node_cycling, uc_step_cycling, &uc_error)) {
-				_updatecycle_stat(us_node_cycling, uc_step_cycling, uc_error);
-				_log_cycles_step(ul_cycles_counter, us_node_cycling, uc_error, uc_step_cycling);
-				if (uc_error != ERROR_NO_ERROR) {
-					_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
-					uc_step_cycling = 0;
-					us_node_cycling++;
-				} else {
-					if ((uc_lastblock == 0) && (uc_step_cycling == NEXBLOCK_REQUEST)) {
-
-					} else {
-						uc_step_cycling++;
-						ul_timer_next_cycle = TIMER_BETWEEN_MESSAGES      ;
-						LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Waiting next cycle\r\n"));
-					}
-
-					if (uc_step_cycling == NUM_STEPS) {
-						_log_S02_Status(ul_cycles_counter, us_node_cycling);
+		if (sb_enable_dlms_cycles) {
+			if (us_node_cycling < us_num_registered_nodes) {
+				if (_execute_cycle(us_node_cycling, uc_step_cycling, &uc_error)) {
+					_updatecycle_stat(us_node_cycling, uc_step_cycling, uc_error);
+					_log_cycles_step(ul_cycles_counter, us_node_cycling, uc_error, uc_step_cycling);
+					if (uc_error != ERROR_NO_ERROR) {
 						_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
 						uc_step_cycling = 0;
 						us_node_cycling++;
+					} else {
+						if ((uc_lastblock == 0) && (uc_step_cycling == NEXBLOCK_REQUEST)) {
+
+						} else {
+							uc_step_cycling++;
+							ul_timer_next_cycle = sul_dlms_time_between_msg      ;
+							LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Waiting next cycle\r\n"));
+						}
+
+						if (uc_step_cycling == NUM_STEPS) {
+							_log_S02_Status(ul_cycles_counter, us_node_cycling);
+							_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
+							uc_step_cycling = 0;
+							us_node_cycling++;
+						}
 					}
 				}
+			} else {
+				ul_total_time_cycle = _get_time_ms() - ul_start_time_cycle;
+				_log_full_cycles_time(ul_cycles_counter, ul_total_time_cycle);
+				ul_cycles_counter++;
+				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
+
+				if (sb_enable_preq_cycles) {
+					/* Get Path Nodes Info before each complete cycle */
+					us_num_path_nodes = 0;
+					st_sort_cycles = SC_PATH_REQUEST_LIST;
+				} else {
+					/* Next Cycles */
+					us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+					st_sort_cycles = SC_TIME_NEXT_CYCLE;
+					ul_timer_next_cycle = sul_dlms_time_between_cycles;
+				}
 			}
-		} else {
-			ul_total_time_cycle = _get_time_ms() - ul_start_time_cycle;
-			_log_full_cycles_time(ul_cycles_counter, ul_total_time_cycle);
-			ul_cycles_counter++;
-			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-			/* Get Path Nodes Info before each complete cycle */
-			us_num_path_nodes = 0;
-			st_sort_cycles = SC_PATH_REQUEST_LIST;
-#else
-			/* Next Cycles */
-			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
-			st_sort_cycles = SC_TIME_NEXT_CYCLE;
-			ul_timer_next_cycle = TIMER_BETWEEN_CYCLES;
-#endif
 		}
-#endif
 		break;
 	}
 }
@@ -1144,10 +1174,11 @@ void dlms_emu_join_node(uint8_t *puc_extended_address, uint16_t us_short_address
 	/* Add node to the list */
 	//_add_node_to_list(puc_extended_address, us_short_address);
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-	/* Restart timer */
-	ul_timer_max_to_req_paths = TIME_MAX_BETWEEN_PREQ_WITOUT_DATA;
-#endif
+	if (sb_enable_preq_cycles) {
+		/* Restart timer */
+		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+	}
+
 }
 
 /**
@@ -1164,10 +1195,10 @@ void dlms_emu_leave_node(uint16_t us_short_address)
 	/* Remove node to the list */
 	//_remove_node_from_list(us_short_address);
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-	/* Restart timer */
-	ul_timer_max_to_req_paths = TIME_MAX_BETWEEN_PREQ_WITOUT_DATA;
-#endif
+	if (sb_enable_preq_cycles) {
+		/* Restart timer */
+		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+	}
 }
 
 /**
@@ -1179,10 +1210,11 @@ void dlms_emu_data_ind_handler(void *pvDataIndication)
 	/* Pass Data Indication to IP layer */
 	ipv6_receive_packet ((struct TAdpDataIndication *)pvDataIndication);
 
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-	/* Restart timer */
-	ul_timer_max_to_req_paths = TIME_MAX_BETWEEN_PREQ_WITOUT_DATA;
-#endif
+	if (sb_enable_preq_cycles) {
+		/* Restart timer */
+		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+	}
+
 }
 
 /**
@@ -1191,26 +1223,26 @@ void dlms_emu_data_ind_handler(void *pvDataIndication)
  */
 void dlms_emu_path_node_cfm(struct TAdpPathDiscoveryConfirm *pPathDiscoveryConfirm)
 {
-#ifdef DLMS_EMU_ENABLE_PATH_REQ
-	struct TAdpPathDiscoveryConfirm *px_path_node;
+	if (sb_enable_preq_cycles) {
+		struct TAdpPathDiscoveryConfirm *px_path_node;
 
-	/* Use us_num_path_nodes as index of the path table */
-	px_path_node = &sx_path_nodes[us_num_path_nodes];
+		/* Use us_num_path_nodes as index of the path table */
+		px_path_node = &sx_path_nodes[us_num_path_nodes];
 
-	/* Update PATH info */
-	memcpy(px_path_node, pPathDiscoveryConfirm, sizeof(struct TAdpPathDiscoveryConfirm));
+		/* Update PATH info */
+		memcpy(px_path_node, pPathDiscoveryConfirm, sizeof(struct TAdpPathDiscoveryConfirm));
 
 
-	/* Reset PREQ waiting timer */
-	ul_timer_wait_path_cfm = 0;
+		/* Reset PREQ waiting timer */
+		ul_timer_wait_path_cfm = 0;
 
-	/* Update next node */
-	us_num_path_nodes++;
+		/* Update next node */
+		us_num_path_nodes++;
 
-	/* Restart timer */
-	ul_timer_max_to_req_paths = TIME_MAX_BETWEEN_PREQ_WITOUT_DATA;
-#else
-	(void)pPathDiscoveryConfirm;
-#endif
+		/* Restart timer */
+		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+	} else {
+		(void)pPathDiscoveryConfirm;
+	}
 }
 

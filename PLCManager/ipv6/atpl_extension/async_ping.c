@@ -324,6 +324,7 @@ error_t async_ping_rcv( systime_t *rtt)
    size_t length;
 
    message = s_ping_status.message;
+   error = NO_ERROR;
 
    //Timeout value exceeded?
    if((osGetSystemTime() - s_ping_status.startTime) < s_ping_status.timeout)
@@ -437,5 +438,5 @@ error_t async_ping_rcv( systime_t *rtt)
 	   return ERROR_NO_RESPONSE;
    }
 
-
+   return error;
 }

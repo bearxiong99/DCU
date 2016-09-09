@@ -34,8 +34,12 @@
 #include "os_port_none.h"
 #include "debug.h"
 
+#include "time.h"
+
 //Tick count
 systime_t systemTicks = 0;
+
+static struct timeval sx_timeSys_init;
 
 
 /**
@@ -46,6 +50,8 @@ void osInitKernel(void)
 {
    //Initialize tick count
    systemTicks = 0;
+
+   gettimeofday(&sx_timeSys_init, NULL);
 }
 
 
@@ -333,13 +339,24 @@ void osReleaseMutex(OsMutex *mutex)
 
 systime_t osGetSystemTime(void)
 {
-   systime_t time;
+	systime_t time;
+	struct timeval time_value;
+	struct timeval temp_diff;
 
-   //Get current tick count
-   time = systemTicks;
+	gettimeofday(&time_value, NULL);
 
-   //Convert system ticks to milliseconds
-   return OS_SYSTICKS_TO_MS(time);
+	temp_diff.tv_sec = time_value.tv_sec - sx_timeSys_init.tv_sec;
+	temp_diff.tv_usec= time_value.tv_usec - sx_timeSys_init.tv_usec;
+
+	/* Using while instead of if below makes the code slightly more robust. */
+	while(temp_diff.tv_usec < 0) {
+		temp_diff.tv_usec += 1000000;
+		temp_diff.tv_sec -= 1;
+	}
+
+	time = (systime_t)((temp_diff.tv_sec * 1000) + (temp_diff.tv_usec / 1000));
+
+	return time;
 }
 
 

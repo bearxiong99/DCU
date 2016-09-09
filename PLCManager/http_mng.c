@@ -31,10 +31,10 @@ static int si_http_data_fd;
 static unsigned char suc_http_rx_buf[MAX_HTTP_BUFFER_SIZE];
 static unsigned char suc_http_tx_buf[MAX_HTTP_BUFFER_SIZE];
 
-#define HOST "127.0.0.1"  //"coding.debuntu.org"
-#define CMD0 "/cmd"
-#define PORT 3000
-#define USERAGENT "HTMLGET 1.0"
+#define HOST       "127.0.0.1"
+#define CMD0       "/pibrsp"
+#define PORT       3000
+#define USERAGENT  "HTMLGET 1.0"
 
 static void _build_get_query(char *page)
 {
@@ -72,20 +72,34 @@ static void _build_post_query(char *page)
 static void _http_rcv_cmd(uint8_t* buf, uint16_t buflen)
 {
     uint8_t *puc_buf;
-    bool b_cmd;
+    uint8_t *puc_getpib;
+    uint16_t us_pib_id;
 
     puc_buf = buf;
 
     printf("%s\r\n\r\n", puc_buf);
 
-    b_cmd = true;
+    puc_getpib = (uint8_t *)strstr(puc_buf, "getpib");
+
     // Analizar el contenido del mensaje para saber si es respuesta o comando
-    if (b_cmd) {
-    	// NODE RESPONSE
+    if (puc_getpib) {
+    	// Extract command
+    	puc_getpib += 9;
+    	us_pib_id = (*puc_getpib++ - 0x30) * 10;
+    	us_pib_id += (*puc_getpib - 0x30);
+
+    	switch(us_pib_id) {
+    	case 12:
+    		printf("PIB Route Table Request\r\n");
+    		http_mng_send_cmd();
+    		break;
+    	default:
+    		printf("PIB not defined\r\n");
+    	}
 
 
     } else {
-    	// NODE COMMAND
+    	// ERROR
 
     }
 
@@ -100,27 +114,8 @@ void http_mng_init(void)
 	serverAddress.sin_port = htons(PORT);
 
 	memset(suc_http_rx_buf, 0x00, MAX_HTTP_BUFFER_SIZE);
+
 }
-
-/*void http_mng_process(void)
-{
-	uint16_t us_data_len;
-
-	//Receive a reply from the server
-	if (sb_http_connect) {
-		us_data_len = read(si_http_socket_fd , suc_http_rx_buf , MAX_HTTP_BUFFER_SIZE);
-		if (us_data_len) {
-			PRINTF("recv mesg\n");
-			_http_rcv_cmd(suc_http_rx_buf, us_data_len);
-
-			// close the socket
-			socket_dettach_connection(PLC_MNG_HTTP_MNG_APP_ID, si_http_socket_fd);
-
-			// Update connection status
-			sb_http_connect = false;
-		}
-	}
-}*/
 
 void http_mng_send_cmd(void)
 {
@@ -131,33 +126,31 @@ void http_mng_send_cmd(void)
 	//_build_post_query(CMD0);
 
 	/* Send HTTP REST API to the server */
-	if (b_send_cmd) {
-		/* Check internal http connection */
-		if (!sb_http_connect) {
-			/* Create Client socket to connect NODE JS server */
-			si_http_socket_fd = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
-			if (si_http_socket_fd == -1)	{
-				PRINTF("Could not create socket\n");
-				return;
-			}
-
-			//Connect to remote server
-			if (connect(si_http_socket_fd , (struct sockaddr *)&serverAddress , sizeof(serverAddress)) == SOCKET_ERROR) {
-				PRINTF("connect failed. Error\n");
-				sb_http_connect = false;
-			} else {
-				PRINTF("Connected\n");
-				sb_http_connect = true;
-
-				/* Add listener to USI port */
-				socket_attach_connection(PLC_MNG_HTTP_MNG_APP_ID, si_http_socket_fd);
-			}
+	/* Check internal http connection */
+	if (!sb_http_connect) {
+		/* Create Client socket to connect NODE JS server */
+		si_http_socket_fd = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
+		if (si_http_socket_fd == -1)	{
+			PRINTF("Could not create socket\n");
+			return;
 		}
 
-		if (sb_http_connect) {
-			if (write(si_http_socket_fd, (char *)suc_http_tx_buf, strlen((char *)suc_http_tx_buf)) == SOCKET_ERROR) {
-				PRINTF ("Cannot sent message");
-			}
+		//Connect to remote server
+		if (connect(si_http_socket_fd , (struct sockaddr *)&serverAddress , sizeof(serverAddress)) == SOCKET_ERROR) {
+			PRINTF("connect failed. Error\n");
+			sb_http_connect = false;
+		} else {
+			PRINTF("Connected\n");
+			sb_http_connect = true;
+
+			/* Add listener to USI port */
+			socket_attach_connection(PLC_MNG_HTTP_MNG_APP_ID, si_http_socket_fd);
+		}
+	}
+
+	if (sb_http_connect) {
+		if (write(si_http_socket_fd, (char *)suc_http_tx_buf, strlen((char *)suc_http_tx_buf)) == SOCKET_ERROR) {
+			PRINTF ("Cannot sent message");
 		}
 	}
 }
