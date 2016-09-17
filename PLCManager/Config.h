@@ -3,6 +3,9 @@
 
 #include "conf_bs.h"
 
+/* Work Band : ADP_BAND_CENELEC_A, ADP_BAND_CENELEC_B, ADP_BAND_FCC, ADP_BAND_ARIB*/
+#define WORK_BAND                 ADP_BAND_FCC
+
 /* Enable IPv6 stack */
 #define OSS_ENABLE_IPv6_STACK_SUPPORT
 

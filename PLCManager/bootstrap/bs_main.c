@@ -47,7 +47,6 @@ static void _rekeying_process(void)
 {
 	struct TAddress dstAddr;
 	struct TAdpExtendedAddress x_ext_address;
-	struct TAdpGetConfirm getConfirm;
 
 	memcpy(x_ext_address.m_au8Value, g_lbds_list[us_rekey_idx].puc_extended_address, ADP_ADDRESS_64BITS);
 
@@ -80,7 +79,6 @@ static void _rekeying_process(void)
 static void AdpNotification_LbpIndication(struct TAdpLbpIndication *pLbpIndication)
 {
 	struct TAddress dstAddr;
-	struct TAdpGetConfirm getConfirm;
 	uint16_t u16NsduLength;
 	uint8_t *pNsdu;
 	enum lbp_indications indication = LBS_NONE;
@@ -240,7 +238,6 @@ void bs_lbp_kick_device(uint16_t us_short_address)
 	/* Check if the device had joined the network */
 	if(device_is_in_list(us_short_address)) {
 		struct TAdpAddress dstAddr;
-		struct TAdpGetConfirm getConfirm;
 		uint8_t puc_extended_address[ADP_ADDRESS_64BITS];
 
 		/* Send KICK to the device */

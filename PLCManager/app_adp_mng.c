@@ -18,6 +18,7 @@
 #include "drivers/g3/network_adapter_g3.h"
 #include "app_adp_mng.h"
 #include "dlms_emu_coord.h"
+#include "dlms_emu_report.h"
 #include "bs_api.h"
 
 /* MAC include */
@@ -260,7 +261,7 @@ static void InitializeStack(void)
 	notifications.fnctAdpUpdNonVolatileDataIndication = AppAdpNotification_UpdNonVolatileDataIndication;
 	notifications.fnctAdpPREQIndication = NULL;
 
-	AdpInitialize(&notifications, ADP_BAND_CENELEC_A);
+	AdpInitialize(&notifications, WORK_BAND);
 }
 
 static void InitializeModemParameters(void)
@@ -321,7 +322,7 @@ void adp_mng_process(void)
  * \brief Update the list of registered nodes from Bootstrap module.
  *
  */
-uint16_t app_update_registered_nodes(void *pxNodeList)
+uint16_t adp_mng_update_registered_nodes(void *pxNodeList)
 {
 	x_node_list_t *px_list_ptr;
 	struct t_bs_lbp_get_param_confirm p_get_confirm;

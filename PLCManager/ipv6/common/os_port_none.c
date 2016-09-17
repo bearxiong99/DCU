@@ -34,7 +34,7 @@
 #include "os_port_none.h"
 #include "debug.h"
 
-#include "time.h"
+#include "sys/time.h"
 
 //Tick count
 systime_t systemTicks = 0;

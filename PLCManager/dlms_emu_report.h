@@ -22,4 +22,6 @@ int dlms_emu_report_xml_init(void);
 void dlms_emu_report_xml_end(int xml_fd);
 void dlms_emu_report_xml_add_node(int xml_fd, uint16_t u16Addr, uint8_t *pu8Addr);
 
+int dlms_emu_report_json_obj(x_net_info_t *net_info);
+
 #endif /* DLMS_EMU_REPORT_H_INCLUDED */

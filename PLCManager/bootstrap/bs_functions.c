@@ -12,6 +12,7 @@
 #include "bs_functions.h"
 #include "bs_api.h"
 #include "conf_bs.h"
+#include "Config.h"
 
 #include "time.h"
 
@@ -501,7 +502,6 @@ void set_psk(uint8_t *puc_new_psk)
 void lbp_init_functions(void)
 {
 	uint8_t uc_band_id;
-	struct TAdpMacGetConfirm x_pib_confirm;
 
 	g_current_context.currentShortAddr = 0;
 	// The first short address is initially set to 1
@@ -523,7 +523,7 @@ void lbp_init_functions(void)
 
 	/* Properly configure IDS according to band */
 	//uc_band_id = x_pib_confirm.m_au8AttributeValue[0];
-	uc_band_id = BAND_CENELEC_A;
+	uc_band_id = WORK_BAND;
 
 	if (uc_band_id == BAND_ARIB) {
 		g_IdS.uc_size = NETWORK_ACCESS_IDENTIFIER_MAX_SIZE_S;
@@ -834,7 +834,6 @@ static uint8_t _dev_is_in_blacklist(uint8_t *puc_address)
  */
 enum lbp_indications ProcessLBPMessage(unsigned char *pNsdu, unsigned short u16NsduLen)
 {
-	static uint32_t ul_bs_start = 0;
 	static uint8_t uc_bs_in_progress = 0;
 	static struct TAdpExtendedAddress ext_address_in_process;
     unsigned char u8MessageType = ((pNsdu[0] & 0xF0) >> 4);

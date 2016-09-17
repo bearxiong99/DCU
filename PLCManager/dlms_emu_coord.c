@@ -55,6 +55,7 @@
 #include "app_adp_mng.h"
 #include "Config.h"
 #include "async_ping.h"
+#include "dlms_emu_report.h"
 
 #define UNUSED(v)                  (void)(v)
 #define ADP_PATH_METRIC_TYPE       0
@@ -190,21 +191,19 @@ const uint8_t release_response_val[] = {0x63, 0x03, 0x80, 0x01, 0x00};
 const uint8_t get_request_s02val[] = {0xC4, 0x02};
 const uint8_t get_request_date_val[] = {0xC4, 0x01, 0xC1, 0x00, 0x09};
 
-static x_node_list_t px_node_list[DLMS_MAX_DEV_NUM];
+static x_node_list_t spx_node_list[DLMS_MAX_DEV_NUM];
 static x_cycles_stat_t sx_cycles_stat[DLMS_MAX_DEV_NUM];
-static uint16_t us_num_registered_nodes;
-static uint16_t us_last_position_in_use;
+static uint16_t sus_last_position_in_use;
 static bool sb_update_nodes;
-static uint32_t ul_timer_dlms_start_wait;
-static uint32_t ul_cycles_counter;
-static uint16_t us_node_cycling;
-static uint8_t uc_step_cycling;
-static uint32_t ul_timer_next_cycle;
-static uint32_t ul_time_out;
+static uint32_t sul_timer_dlms_start_wait;
+static uint32_t sul_cycles_counter;
+static uint16_t sus_node_cycling;
+static uint8_t suc_step_cycling;
+static uint32_t sul_timer_next_cycle;
+static uint32_t sul_time_out;
 
-static uint16_t us_num_path_nodes;
-static uint32_t ul_timer_wait_path_cfm;
-static uint32_t ul_timer_max_to_req_paths;
+static uint32_t sul_timer_wait_path_cfm;
+static uint32_t sul_timer_max_to_req_paths;
 static struct TAdpPathDiscoveryConfirm sx_path_nodes[DLMS_MAX_DEV_NUM];
 
 
@@ -223,12 +222,12 @@ struct s_ping_cycle_status_t s_ping_cycle_status;
 static bool sb_ping_sent;
 
 
-static bool new_cmd;
-static uint8_t uc_lastblock;
-static uint8_t uc_blocknumber;
-static uint32_t ul_total_time_cycle;
-static uint32_t ul_start_time_cycle;
-static uint32_t ul_start_time_node_cycle;
+static bool s_new_cmd;
+static uint8_t suc_lastblock;
+static uint8_t suc_blocknumber;
+static uint32_t sul_total_time_cycle;
+static uint32_t sul_start_time_cycle;
+static uint32_t sul_start_time_node_cycle;
 
 static time_t sul_sys_time;
 static struct timeval sx_time_init_value;
@@ -249,6 +248,9 @@ NetInterface *plc_interface = &netInterface[0];
 
 /* Own Extended Address */
 static uint8_t spuc_extended_address[8];
+
+/* Netwrok Information */
+static x_net_info_t net_Info;
 
 static void _init_ping_cycle_status_data(void){
 	uint32_t ul_i;
@@ -271,8 +273,8 @@ static error_t _send_ping_to_dev(uint32_t ul_dev_idx)
 	/* Adapt the IPv6 address to the G3 connection data */
 	srcIpAddr.ipv6Addr.b[8] = (uint8_t) (DLMS_G3_COORD_PAN_ID >> 8);
 	srcIpAddr.ipv6Addr.b[9] = (uint8_t) (DLMS_G3_COORD_PAN_ID);
-	srcIpAddr.ipv6Addr.b[14] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address >> 8);
-	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (px_node_list[ul_dev_idx].us_short_address);
+	srcIpAddr.ipv6Addr.b[14] = (uint8_t) (spx_node_list[ul_dev_idx].us_short_address >> 8);
+	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (spx_node_list[ul_dev_idx].us_short_address);
 	srcIpAddr.length = sizeof(Ipv6Addr);
 
 	x_error = async_ping_send(plc_interface, &srcIpAddr, sul_ping_cycle_len, sul_ping_cycle_ttl, sul_ping_cycle_timeout * 1000);
@@ -310,107 +312,9 @@ static char c_log_cycles_step_query[600];
 static char c_print_result_test_query[120];
 static uint8_t S02Status;
 
-#ifdef JSON_ENABLE
-static char puc_json_obj[50000];
-const char comillas = '"';
-static uint16_t _create_JSON_obj(void)
-{
-	char *pch_json;
-	int str_size;
-	uint8_t uc_idx;
-	uint8_t uc_hops;
-	uint8_t puc_ext_addr[24];
-	uint8_t *ptr_mac;
-	struct TAdpPathDiscoveryConfirm *px_path_nodes;
-
-	memset(puc_json_obj, 0, sizeof(puc_json_obj));
-
-	pch_json = puc_json_obj;
-
-	str_size = sprintf(pch_json, "{\r\n  %cnodes%c:[\r\n", comillas, comillas);
-	pch_json += str_size;
-	memset(puc_ext_addr, 0, sizeof(puc_ext_addr));
-	uc_hops = 0;
-
-	/* First Node is Coordinator */
-	ptr_mac = spuc_extended_address;
-	sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *(ptr_mac + 7), *(ptr_mac + 6), *(ptr_mac + 5),
-					*(ptr_mac + 4), *(ptr_mac + 3), *(ptr_mac + 2), *(ptr_mac + 1), *ptr_mac);
-
-	str_size = sprintf(pch_json, "    {%cu16Addr%c:%c0%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
-			comillas, comillas, comillas, comillas,
-			comillas, comillas, comillas, puc_ext_addr, comillas, comillas, comillas, uc_hops);
-	pch_json += str_size;
-
-	/* List of Device Nodes */
-	for (uc_idx = 0; uc_idx < us_num_registered_nodes; uc_idx++) {
-		uint16_t uc_path_idx;
-		for (uc_path_idx = 0; uc_path_idx < us_num_path_nodes; uc_path_idx++) {
-			if (sx_path_nodes[uc_path_idx].m_u16DstAddr == px_node_list[uc_idx].us_short_address) {
-				uc_hops = sx_path_nodes[uc_path_idx].m_u8ForwardHopsCount;
-				break;
-			}
-		}
-
-		ptr_mac = &px_node_list[uc_idx].puc_extended_address;
-		sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *ptr_mac, *(ptr_mac + 1), *(ptr_mac + 2),
-				*(ptr_mac + 3), *(ptr_mac + 4), *(ptr_mac + 5), *(ptr_mac + 6), *(ptr_mac + 7));
-
-		str_size = sprintf(pch_json, "    {%cu16Addr%c:%c%d%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
-				comillas, comillas, comillas, px_node_list[uc_idx].us_short_address, comillas,
-				comillas, comillas, comillas, puc_ext_addr, comillas, comillas, comillas, uc_hops);
-		pch_json += str_size;
-	}
-	pch_json -= 3; /* remove the last semicolon, CR and LF */
-
-	str_size = sprintf(pch_json, "\r\n  ],\r\n  %clinks%c:[\r\n", comillas, comillas);
-	pch_json += str_size;
-
-	/* List Links */
-	for (uc_idx = 0; uc_idx < us_num_path_nodes; uc_idx++) {
-		uint16_t us_src, us_dst;
-		uint8_t uc_hope_idx;
-
-		px_path_nodes = &sx_path_nodes[uc_idx];
-
-		/* Forward hopes */
-		us_src = 0;
-		for (uc_hope_idx = 0; uc_hope_idx < px_path_nodes->m_u8ForwardHopsCount; uc_hope_idx++) {
-			us_dst = px_path_nodes->m_aForwardPath[uc_hope_idx].m_u16HopAddress;
-			str_size = sprintf(pch_json, "    {%csource%c:%c%d%c,%ctarget%c:%c%d%c,%cvalue%c:%d},\r\n",
-					comillas, comillas, comillas, us_src, comillas,
-					comillas, comillas, comillas, us_dst, comillas,
-					comillas, comillas, px_path_nodes->m_aForwardPath[uc_hope_idx].m_u8LinkCost);
-			pch_json += str_size;
-
-			us_src = us_dst;
-		}
-
-		/* Reverse hopes */
-		us_src = px_path_nodes->m_u16OrigAddr;
-		for (uc_hope_idx = 0; uc_hope_idx < px_path_nodes->m_u8ReverseHopsCount; uc_hope_idx++) {
-			us_dst = px_path_nodes->m_aReversePath[uc_hope_idx].m_u16HopAddress;
-			str_size = sprintf(pch_json, "    {%csource%c:%c%d%c,%ctarget%c:%c%d%c,%cvalue%c:%d},\r\n",
-					comillas, comillas, comillas, us_src, comillas,
-					comillas, comillas, comillas, us_dst, comillas,
-					comillas, comillas, px_path_nodes->m_aForwardPath[uc_hope_idx].m_u8LinkCost);
-			pch_json += str_size;
-
-			us_src = us_dst;
-		}
-	}
-
-	pch_json -= 3; /* remove the last semicolon, CR and LF */
-	str_size = sprintf(pch_json, "\r\n  ]\r\n}");
-	pch_json += str_size;
-
-	return ((uint16_t)(pch_json - puc_json_obj));
-}
-#endif
-
 static void _log_S02_Status(uint32_t cycleId, uint16_t us_node)
 {
-	sprintf(c_log_cycles_step_query, "cycle %u node> 0x%04x; status> %d", cycleId, px_node_list[us_node].us_short_address, S02Status);
+	sprintf(c_log_cycles_step_query, "cycle %u node> 0x%04x; status> %d", cycleId, spx_node_list[us_node].us_short_address, S02Status);
 	printf("[DLMS_EMU] %s\r\n", c_log_cycles_step_query);
 	S02Status = 0;
 }
@@ -426,9 +330,9 @@ static void _log_full_cycles_time(uint32_t ul_cycleId, uint32_t ul_cycleTime)
 
 	/* Summary nodes  */
 	us_node_idx = 0;
-	while (us_node_idx < us_num_registered_nodes) {
+	while (us_node_idx < net_Info.us_num_nodes) {
 		sprintf(c_log_cycles_step_query, "node ID: 0x%04x   Success: %u   Errors: %u   Availability: %u   TimerCycle: %u",
-			px_node_list[us_node_idx].us_short_address, sx_cycles_stat[us_node_idx].ul_success,
+			spx_node_list[us_node_idx].us_short_address, sx_cycles_stat[us_node_idx].ul_success,
 			sx_cycles_stat[us_node_idx].ul_errors,
 			(((sx_cycles_stat[us_node_idx].ul_success * 100) / (sx_cycles_stat[us_node_idx].ul_success + sx_cycles_stat[us_node_idx].ul_errors) * 100) / 100),
 			sx_cycles_stat[us_node_idx].ul_cmean_time);
@@ -443,7 +347,7 @@ static void _log_full_cycles_time(uint32_t ul_cycleId, uint32_t ul_cycleTime)
 static void _updatecycle_stat(uint8_t uc_node_idx, uint8_t uc_step, uint8_t uc_error)
 {
 	if (uc_error == ERROR_NO_ERROR) {
-		if (uc_step_cycling == 2 || uc_step == 4) {
+		if (suc_step_cycling == 2 || uc_step == 4) {
 			sx_cycles_stat[uc_node_idx].ul_success++;
 			S02Status++;
 		}
@@ -454,7 +358,7 @@ static void _updatecycle_stat(uint8_t uc_node_idx, uint8_t uc_step, uint8_t uc_e
 
 static void _log_cycles_step(uint32_t ul_cycleId, uint16_t us_node, uint8_t uc_status, uint8_t uc_step)
 {
-	sprintf(c_log_cycles_step_query, "cycleId: %u, 0x%04x, status: %d, step: %d", ul_cycleId, px_node_list[us_node].us_short_address, uc_status, uc_step);
+	sprintf(c_log_cycles_step_query, "cycleId: %u, 0x%04x, status: %d, step: %d", ul_cycleId, spx_node_list[us_node].us_short_address, uc_status, uc_step);
 	LOG_APP_REPORT(("[DLMS_EMU] %s\r\n", c_log_cycles_step_query));
 }
 
@@ -464,12 +368,12 @@ static void _log_cycles_step(uint32_t ul_cycleId, uint16_t us_node, uint8_t uc_s
 static void _print_result_test(uint8_t uc_node_idx, uint8_t uc_step, uint8_t uc_error, uint32_t num_cycle)
 {
 	uint32_t cTime;
-	cTime = _get_time_ms() - ul_start_time_node_cycle;
+	cTime = _get_time_ms() - sul_start_time_node_cycle;
 
 	if ((uc_step == NUM_STEPS) && (uc_error == ERROR_NO_ERROR)) {
-		sprintf(c_print_result_test_query, "[0x%04x] Time %u \tOK", px_node_list[uc_node_idx].us_short_address, cTime);
+		sprintf(c_print_result_test_query, "[0x%04x] Time %u \tOK", spx_node_list[uc_node_idx].us_short_address, cTime);
 	} else {
-		sprintf(c_print_result_test_query, "[0x%04x] step: %d Time %u \t >ERROR", px_node_list[uc_node_idx].us_short_address, uc_step, cTime);
+		sprintf(c_print_result_test_query, "[0x%04x] step: %d Time %u \t >ERROR", spx_node_list[uc_node_idx].us_short_address, uc_step, cTime);
 	}
 
 	/* UPDATE MEAN CYCLE TIME */
@@ -477,85 +381,7 @@ static void _print_result_test(uint8_t uc_node_idx, uint8_t uc_step, uint8_t uc_
 	LOG_APP_REPORT(("[DLMS_EMU] %s\r\n", c_print_result_test_query));
 }
 #endif
-/*
-static void _add_node_to_list(uint8_t *puc_extended_address, uint16_t us_short_address)
-{
-	x_node_list_t *px_list_ptr;
-	uint16_t us_idx, us_first_pos_free;
-	uint8_t uc_node_found;
 
-	if (us_short_address == 0) {
-		// Invalid address
-		return;
-	}
-
-	px_list_ptr = px_node_list;
-
-	uc_node_found = false;
-	us_first_pos_free = 0xFFFF;
-
-	// Search Node in the list
-	for (us_idx = 0; us_idx < us_last_position_in_use; us_idx++, px_list_ptr++) {
-		if ((px_list_ptr->us_short_address == 0) && (us_idx < us_first_pos_free)) {
-			// update free position to add node
-			us_first_pos_free = us_idx;
-		}
-
-		if (px_list_ptr->us_short_address == us_short_address) {
-			// Node is already in list
-			uc_node_found = true;
-			break;
-		}
-	}
-
-	if (uc_node_found == false) {
-		// update last position in use
-		if (us_first_pos_free == 0xFFFF) {
-			// Add node to the next position
-			us_first_pos_free = us_last_position_in_use;
-			us_last_position_in_use++;
-		}
-
-		// Add node to free position
-		px_node_list[us_first_pos_free].us_short_address = us_short_address;
-		memcpy(px_node_list[us_first_pos_free].puc_extended_address, puc_extended_address, 8);
-		// Update number of nodes
-		us_num_registered_nodes++;
-	}
-}
-
-static void _remove_node_from_list(uint16_t us_short_address)
-{
-	x_node_list_t *px_list_ptr;
-	uint16_t us_idx;
-	uint8_t uc_node_found;
-
-	if (us_short_address == 0) {
-		// Invalid address
-		return;
-	}
-
-	px_list_ptr = px_node_list;
-
-	uc_node_found = false;
-
-	// Search Node in the list
-	for (us_idx = 0; us_idx < us_last_position_in_use; us_idx++, px_list_ptr++) {
-		if (px_list_ptr->us_short_address == us_short_address) {
-			// Node is already in list
-			uc_node_found = true;
-			break;
-		}
-	}
-
-	if (uc_node_found) {
-		// Remove node
-		px_node_list[us_idx].us_short_address = 0;
-		// Update number of nodes
-		us_num_registered_nodes--;
-	}
-}
-*/
 //***********************************************************************************
 /**
  *************************************************************************************/
@@ -592,9 +418,9 @@ static uint8_t _checkReceivedData(uint8_t uc_step, uint8_t *data)
 			value = true;
 			if (*(data + 3) == 0x01) {
 				/* last block received */
-				uc_lastblock = 1;
+				suc_lastblock = 1;
 			}
-			LOG_APP_DEBUG(("[DLMS_EMU] NEXBLOCK_REQUEST received. Last block: %d\r\n", uc_lastblock));
+			LOG_APP_DEBUG(("[DLMS_EMU] NEXBLOCK_REQUEST received. Last block: %d\r\n", suc_lastblock));
 		} else {
 			LOG_APP_DEBUG(("[DLMS_EMU] Error: wrong message received in DLMS step %d\r\n", uc_step));
 		}
@@ -627,35 +453,35 @@ static uint16_t _generateStr(uint8_t uc_step, uint8_t uc_invoke_order)
 	case ASSOCIATION_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_associationRequest);
 		puc_dlms_message = cmd_DLMS_associationRequest;
-		LOG_APP_DEBUG(("[DLMS_EMU] ASSOCIATION_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
+		LOG_APP_DEBUG(("[DLMS_EMU] ASSOCIATION_REQUEST sent to node [0x%04x]\r\n", spx_node_list[sus_node_cycling].us_short_address));
 		break;
 	case DATE_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_date_OBIS0000010000FF_0008_02);
 		puc_dlms_message = cmd_DLMS_date_OBIS0000010000FF_0008_02;
 		cmd_DLMS_date_OBIS0000010000FF_0008_02[2] = uc_invoke_order;
-		LOG_APP_DEBUG(("[DLMS_EMU] DATE_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
+		LOG_APP_DEBUG(("[DLMS_EMU] DATE_REQUEST sent to node [0x%04x]\r\n", spx_node_list[sus_node_cycling].us_short_address));
 		break;
 	case SO2_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_S02_OBIS0100630100FF_0007_02);
 		puc_dlms_message = cmd_DLMS_S02_OBIS0100630100FF_0007_02;
 		cmd_DLMS_S02_OBIS0100630100FF_0007_02[2] = uc_invoke_order + 1;
-		uc_lastblock = 0;
-		uc_blocknumber = 1;
-		LOG_APP_DEBUG(("[DLMS_EMU] S02_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
+		suc_lastblock = 0;
+		suc_blocknumber = 1;
+		LOG_APP_DEBUG(("[DLMS_EMU] S02_REQUEST sent to node [0x%04x]\r\n", spx_node_list[sus_node_cycling].us_short_address));
 		break;
 	case NEXBLOCK_REQUEST:
 		ui_lenghtmsg = sizeof(cmd_DLMS_NextBlock);
 		puc_dlms_message = cmd_DLMS_NextBlock;
 		cmd_DLMS_NextBlock[2] = uc_invoke_order + 1;
-		uc_blocknumber++;
-		cmd_DLMS_NextBlock[6] = uc_blocknumber;
-		LOG_APP_DEBUG(("[DLMS_EMU] NEXBLOCK_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
+		suc_blocknumber++;
+		cmd_DLMS_NextBlock[6] = suc_blocknumber;
+		LOG_APP_DEBUG(("[DLMS_EMU] NEXBLOCK_REQUEST sent to node [0x%04x]\r\n", spx_node_list[sus_node_cycling].us_short_address));
 		break;
 	case RELEASE_REQUEST:
 	default:
 		ui_lenghtmsg = sizeof(cmd_DLMS_release_request);
 		puc_dlms_message = cmd_DLMS_release_request;
-		LOG_APP_DEBUG(("[DLMS_EMU] RELEASE_REQUEST sent to node [0x%04x]\r\n", px_node_list[us_node_cycling].us_short_address));
+		LOG_APP_DEBUG(("[DLMS_EMU] RELEASE_REQUEST sent to node [0x%04x]\r\n", spx_node_list[sus_node_cycling].us_short_address));
 		break;
 
 	}
@@ -684,16 +510,16 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 	/* Adapt the IPv6 address to the G3 connection data */
 	srcIpAddr.ipv6Addr.b[8] = (uint8_t) (DLMS_G3_COORD_PAN_ID >> 8);
 	srcIpAddr.ipv6Addr.b[9] = (uint8_t) (DLMS_G3_COORD_PAN_ID);
-	srcIpAddr.ipv6Addr.b[14] = (uint8_t) (px_node_list[us_node].us_short_address >> 8);
-	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (px_node_list[us_node].us_short_address);
+	srcIpAddr.ipv6Addr.b[14] = (uint8_t) (spx_node_list[us_node].us_short_address >> 8);
+	srcIpAddr.ipv6Addr.b[15] = (uint8_t) (spx_node_list[us_node].us_short_address);
 	srcIpAddr.length = sizeof(Ipv6Addr);
 
 	socketReceiveFrom(px_udp_plc_socket, &srcIpAddr, &us_src_port, (uint8_t *)pUdpPayload_rx, DLMS_MAX_RX_SIZE, &act_rx_size, SOCKET_FLAG_WAIT_ALL);
 
 	if(act_rx_size > 0) {
-		new_cmd = true;
+		s_new_cmd = true;
 	} else {
-		new_cmd = false;
+		s_new_cmd = false;
 	}
 
 	switch (st_execute_cycle) {
@@ -702,17 +528,17 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 
 		/* Get Initial time to start cycle with new node */
 		if (uc_step == 0) {
-			ul_start_time_node_cycle = _get_time_ms();
+			sul_start_time_node_cycle = _get_time_ms();
 		}
 
-		if (px_node_list[us_node].us_short_address == DLMS_INVALID_ADDRESS) {
+		if (spx_node_list[us_node].us_short_address == DLMS_INVALID_ADDRESS) {
 			*puc_error = ERROR_NON_CONNECTED_NODE;
 			end = true;
 			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: Nothing to send (no connected nodes)\r\n"));
 
 		} else {
 			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: SEND - sending data...\r\n"));
-			us_lenght_msg = _generateStr(uc_step_cycling, 0xc1);
+			us_lenght_msg = _generateStr(suc_step_cycling, 0xc1);
 
 			x_error = socketSendTo(px_udp_plc_socket, &srcIpAddr, us_src_port, pUdpPayload_tx, us_lenght_msg, &act_tx_size, SOCKET_FLAG_WAIT_ALL);
 
@@ -720,22 +546,22 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 				LOG_APP_DEBUG(("[DLMS_EMU] Unsuccessful socketSendTo()!\r\n"));
 			}
 
-			ul_time_out = sul_dlms_time_out_data_cycles ;
+			sul_time_out = sul_dlms_time_out_data_cycles ;
 			st_execute_cycle = WAIT_DATA_CONFIRM;
 		}
 		break;
 
 	case WAIT_DATA_CONFIRM:
-		if (!ul_time_out) {
+		if (!sul_time_out) {
 			*puc_error = ERROR_TIMEOUT_DATA_CONFIRM;
 			end = true;
 			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: ERROR_TIMEOUT_DATA_CONFIRM\r\n"));
 		}
 
-		if (new_cmd) {
-			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: new_cmd RX\r\n"));
+		if (s_new_cmd) {
+			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: s_new_cmd RX\r\n"));
 
-			ul_time_out = sul_dlms_time_out_data_cycles ;
+			sul_time_out = sul_dlms_time_out_data_cycles ;
 
 			if (_checkReceivedData(uc_step, pUdpPayload_rx) == true) {
 				*puc_error = ERROR_NO_ERROR;
@@ -745,7 +571,7 @@ static bool _execute_cycle(uint16_t us_node, uint8_t uc_step, uint8_t* puc_error
 				end = false;
 			}
 			st_execute_cycle = SEND;
-			new_cmd = false;
+			s_new_cmd = false;
 			LOG_APP_DEBUG(("[DLMS_EMU] _execute_cycle: WAIT_DATA_CONFIRM: Cmd processed. Error: %d\r\n", *puc_error));
 		}
 		break;
@@ -824,7 +650,7 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	sb_enable_wait_reg_nodes = true;
 	sb_enable_dlms_cycles = false;
 	sb_enable_ping_cycles = false;
-	sb_enable_preq_cycles = false;
+	sb_enable_preq_cycles = true;
 	sul_ping_cycle_time = 3;
 	sul_ping_cycle_timeout = 60;
 	sul_ping_cycle_ttl = 10;
@@ -834,19 +660,19 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	sul_dlms_time_between_cycles = 20;
 	sul_dlms_time_out_data_cycles = 50;
 	sul_dlms_time_between_msg = 1;
-	sul_dlms_time_waiting_start = 12000;
-	sul_dlms_time_wait_preq_cfm = 120;
+	sul_dlms_time_waiting_start = 60;
+	sul_dlms_time_wait_preq_cfm = 60;
 	sul_dlms_time_between_preq_no_dlms = 60;
 
 	/* Init variables and status */
 	st_sort_cycles = SC_WAIT_INITIAL_LIST;
 	st_registered_nodes = RN_INITIAL_STATE;
 	st_execute_cycle = SEND;
-	us_num_registered_nodes = 0;
-	us_last_position_in_use = 0;
+	net_Info.us_num_nodes = 0;
+	sus_last_position_in_use = 0;
 
 	/* Clear Node Information */
-	memset(px_node_list, 0, sizeof(px_node_list));
+	memset(spx_node_list, 0, sizeof(spx_node_list));
 	memset(sx_cycles_stat, 0, sizeof(sx_cycles_stat));
 
 	/* Pointers to IPv6 payloads */
@@ -858,18 +684,17 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 	LOG_APP_REPORT(("[DLMS_EMU] dlms_emu_init: SC_WAIT_START_CYCLES\r\n"));
 
 	/* Init local vars */
-	ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
-	ul_timer_next_cycle = 0;
-	ul_time_out = 0;
+	sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+	sul_timer_next_cycle = 0;
+	sul_time_out = 0;
 	sb_update_nodes = false;
 
-	ul_cycles_counter = 1;
-	ul_total_time_cycle = 0;
+	sul_cycles_counter = 1;
+	sul_total_time_cycle = 0;
 
-	us_num_path_nodes = 0;
 	memset(sx_path_nodes, 0, sizeof(sx_path_nodes));
-	ul_timer_wait_path_cfm = 0;
-	ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+	sul_timer_wait_path_cfm = 0;
+	sul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
 
 	/* Set Extended Address */
 	memcpy(spuc_extended_address, puc_ext_addr, sizeof(spuc_extended_address));
@@ -882,6 +707,13 @@ void dlms_emu_init(uint8_t *puc_ext_addr)
 
 	sul_sys_time = time(NULL);
 	gettimeofday(&sx_time_init_value, NULL);
+
+	/* Set network info */
+	net_Info.puc_extended_addr = spuc_extended_address;
+	net_Info.us_num_nodes = 0;
+	net_Info.us_num_path_nodes = 0;
+	net_Info.px_node_list = spx_node_list;
+	net_Info.px_path_nodes = sx_path_nodes;
 }
 
 static void _update_counter(uint32_t *pul_counter, uint32_t ul_time_diff)
@@ -919,13 +751,13 @@ static void _dlms_emu_update(void)
 		sul_sys_time = ul_curr_time;
 
 		/* Update counters */
-		_update_counter(&ul_timer_dlms_start_wait, ul_time_diff);
-		_update_counter(&ul_timer_next_cycle, ul_time_diff);
-		_update_counter(&ul_time_out, ul_time_diff);
+		_update_counter(&sul_timer_dlms_start_wait, ul_time_diff);
+		_update_counter(&sul_timer_next_cycle, ul_time_diff);
+		_update_counter(&sul_time_out, ul_time_diff);
 
 		if (sb_enable_preq_cycles) {
-			_update_counter(&ul_timer_wait_path_cfm, ul_time_diff);
-			_update_counter(&ul_timer_max_to_req_paths, ul_time_diff);
+			_update_counter(&sul_timer_wait_path_cfm, ul_time_diff);
+			_update_counter(&sul_timer_max_to_req_paths, ul_time_diff);
 		}
 
 	}
@@ -954,52 +786,52 @@ void dlms_emu_process(void)
 			} else {
 				if(x_error != NO_ERROR) {
 					s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_ping_errors += 1;
-					LOG_APP_REPORT(("[DLMS_EMU] Unsuccessful Ping! to 0x%04x Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address , x_error));
+					LOG_APP_REPORT(("[DLMS_EMU] Unsuccessful Ping! to 0x%04x Error: %d \r\n", spx_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address , x_error));
 					sb_ping_sent = 0;
 				} else {
 					s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_successful += 1;
-					LOG_APP_REPORT(("[DLMS_EMU] Ping Successful to 0x%04x! RoundTripTime: %d\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address, roundTripTime));
+					LOG_APP_REPORT(("[DLMS_EMU] Ping Successful to 0x%04x! RoundTripTime: %d\r\n", spx_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address, roundTripTime));
 					sb_ping_sent = 0;
 				}
 
 				s_ping_cycle_status.ul_current_node_ping++;
 
-				if (s_ping_cycle_status.ul_current_node_ping == us_num_registered_nodes) {
+				if (s_ping_cycle_status.ul_current_node_ping == net_Info.us_num_nodes) {
 					s_ping_cycle_status.ul_current_node_ping = 0;
-					for(i = 0; i < us_num_registered_nodes; i++){
-						LOG_APP_REPORT(("[DLMS_EMU] Ping Report node 0x%04x  -->  Pings sent: %d  ; Successful Ping: %d; Errors: %d Success Rate : %f\r\n",px_node_list[i].us_short_address, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_ping_errors, (100.0 *(float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful)/((float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent) ));
+					for(i = 0; i < net_Info.us_num_nodes; i++){
+						LOG_APP_REPORT(("[DLMS_EMU] Ping Report node 0x%04x  -->  Pings sent: %d  ; Successful Ping: %d; Errors: %d Success Rate : %f\r\n",spx_node_list[i].us_short_address, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful, s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_ping_errors, (100.0 *(float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_successful)/((float)s_ping_cycle_status.as_ping_cycle_node_stats[i].ul_pings_sent) ));
 					}
 				}
 			}
 		}
 
 		if (!sb_ping_sent) {
-			if (us_num_registered_nodes){
+			if (net_Info.us_num_nodes){
 				x_error = _send_ping_to_dev(s_ping_cycle_status.ul_current_node_ping);
 				if (x_error == NO_ERROR) {
-				   LOG_APP_REPORT(("\r\n[DLMS_EMU] Ping to 0x%04x Sent ok!\r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
+				   LOG_APP_REPORT(("\r\n[DLMS_EMU] Ping to 0x%04x Sent ok!\r\n", spx_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
 				   s_ping_cycle_status.as_ping_cycle_node_stats[s_ping_cycle_status.ul_current_node_ping].ul_pings_sent += 1;
 				   sb_ping_sent = true;
 				} else {
-				   LOG_APP_REPORT(("\r\n[DLMS_EMU] Fail sending Ping to 0x%04x!  Error: %d \r\n", px_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address ));
+				   LOG_APP_REPORT(("\r\n[DLMS_EMU] Fail sending Ping to 0x%04x!  Error: %d \r\n", spx_node_list[s_ping_cycle_status.ul_current_node_ping].us_short_address, x_error ));
 				}
 
 			}
 		}
 	}
 
-	if (ul_timer_dlms_start_wait || ul_timer_next_cycle) {
+	if (sul_timer_dlms_start_wait || sul_timer_next_cycle) {
 		return;
 	}
 
 	if (sb_enable_preq_cycles) {
-		if (ul_timer_wait_path_cfm) {
+		if (sul_timer_wait_path_cfm) {
 			return;
 		}
 
-		if (ul_timer_max_to_req_paths == 0) {
+		if (sul_timer_max_to_req_paths == 0) {
 			/* Set status to SC_PATH_REQUEST_LIST */
-			us_num_path_nodes = 0;
+			net_Info.us_num_path_nodes = 0;
 			st_sort_cycles = SC_PATH_REQUEST_LIST;
 		}
 	}
@@ -1008,19 +840,19 @@ void dlms_emu_process(void)
 	case SC_WAIT_INITIAL_LIST:
 		if (sb_update_nodes) {
 			sb_update_nodes = false;
-			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+			net_Info.us_num_nodes = adp_mng_update_registered_nodes(&spx_node_list);
 
-			if (us_num_registered_nodes) {
+			if (net_Info.us_num_nodes) {
 				uint16_t i = 0;
 				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
-				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes));
-				for(i = 0; i < us_num_registered_nodes; i++) {
-					LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address));
+				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", net_Info.us_num_nodes));
+				for(i = 0; i < net_Info.us_num_nodes; i++) {
+					LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, spx_node_list[i].us_short_address));
 				}
 
 				if (sb_enable_preq_cycles) {
 					/* Get Path Nodes Info */
-					us_num_path_nodes = 0;
+					net_Info.us_num_path_nodes = 0;
 					st_sort_cycles = SC_PATH_REQUEST_LIST;
 				} else {
 					/* Start Cycles */
@@ -1028,22 +860,22 @@ void dlms_emu_process(void)
 				}
 
 				/* Init Cycles Variables */
-				ul_cycles_counter = 1;
-				ul_total_time_cycle = 0;
+				sul_cycles_counter = 1;
+				sul_total_time_cycle = 0;
 
 				if (sb_enable_wait_reg_nodes) {
 					/* Waiting Network Stability */
-					ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+					sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 				}
 
 				LOG_APP_DEBUG(("\n[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
 		} else {
 				/* Restart Waiting Timer */
-				ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+				sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 			}
 		} else {
 			/* Restart Waiting Timer */
-			ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+			sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 		}
 		break;
 
@@ -1051,31 +883,23 @@ void dlms_emu_process(void)
 		if (sb_update_nodes) {
 			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
 			sb_update_nodes = false;
-			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+			net_Info.us_num_nodes = adp_mng_update_registered_nodes(&spx_node_list);
 
 			if (sb_enable_wait_reg_nodes) {
-				ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+				sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 			}
 			break;
 
 		}
 
-		if (us_num_registered_nodes == us_num_path_nodes) {
-#ifdef JSON_ENABLE
-			uint16_t us_len, us_idx;
+		if (net_Info.us_num_nodes == net_Info.us_num_path_nodes) {
 
-			us_len = _create_JSON_obj();
-			for (us_idx = 0; us_idx < us_len; us_idx++) {
-				printf("%c", puc_json_obj[us_idx]);
-			}
-			printf("\r\n");
-#endif
 			/* Start Cycles */
 			st_sort_cycles = SC_TIME_NEXT_CYCLE;
-			ul_timer_next_cycle = sul_dlms_time_between_cycles;
+			sul_timer_next_cycle = sul_dlms_time_between_cycles;
 		} else {
-			ul_timer_wait_path_cfm = sul_dlms_time_wait_preq_cfm;
-			AdpPathDiscoveryRequest(px_node_list[us_num_path_nodes].us_short_address, ADP_PATH_METRIC_TYPE);
+			sul_timer_wait_path_cfm = sul_dlms_time_wait_preq_cfm;
+			AdpPathDiscoveryRequest(spx_node_list[net_Info.us_num_path_nodes].us_short_address, ADP_PATH_METRIC_TYPE);
 		}
 		break;
 
@@ -1083,75 +907,75 @@ void dlms_emu_process(void)
 		if (sb_update_nodes) {
 			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Updated joined devices list.\n"));
 			sb_update_nodes = false;
-			us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+			net_Info.us_num_nodes = adp_mng_update_registered_nodes(&spx_node_list);
 
 			if (sb_enable_wait_reg_nodes) {
-				ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+				sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 				break;
 			}
 		}
 
-		if (us_num_registered_nodes) {
-			ul_start_time_cycle = _get_time_ms();
-			us_node_cycling = 0;
-			uc_step_cycling = 0;
+		if (net_Info.us_num_nodes) {
+			sul_start_time_cycle = _get_time_ms();
+			sus_node_cycling = 0;
+			suc_step_cycling = 0;
 			st_sort_cycles = SC_CYCLES;
 
-			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", us_num_registered_nodes));
-			for(i = 0; i < us_num_registered_nodes; i++) {
-				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, px_node_list[i].us_short_address));
+			LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: %d nodes registered.\r\n", net_Info.us_num_nodes));
+			for(i = 0; i < net_Info.us_num_nodes; i++) {
+				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process:    Position: %d -> [0x%04x]\n", i, spx_node_list[i].us_short_address));
 			}
 			LOG_APP_DEBUG(("\n[DLMS_EMU] dlms_emu_process: SC_CYCLES\r\n"));
 
 		} else {
 			/* Restart Waiting Timer */
-			ul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
+			sul_timer_dlms_start_wait = sul_dlms_time_waiting_start;
 			st_sort_cycles = SC_WAIT_INITIAL_LIST;
 		}
 		break;
 
 	case SC_CYCLES:
 		if (sb_enable_dlms_cycles) {
-			if (us_node_cycling < us_num_registered_nodes) {
-				if (_execute_cycle(us_node_cycling, uc_step_cycling, &uc_error)) {
-					_updatecycle_stat(us_node_cycling, uc_step_cycling, uc_error);
-					_log_cycles_step(ul_cycles_counter, us_node_cycling, uc_error, uc_step_cycling);
+			if (sus_node_cycling < net_Info.us_num_nodes) {
+				if (_execute_cycle(sus_node_cycling, suc_step_cycling, &uc_error)) {
+					_updatecycle_stat(sus_node_cycling, suc_step_cycling, uc_error);
+					_log_cycles_step(sul_cycles_counter, sus_node_cycling, uc_error, suc_step_cycling);
 					if (uc_error != ERROR_NO_ERROR) {
-						_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
-						uc_step_cycling = 0;
-						us_node_cycling++;
+						_print_result_test(sus_node_cycling, suc_step_cycling, uc_error, sul_cycles_counter);
+						suc_step_cycling = 0;
+						sus_node_cycling++;
 					} else {
-						if ((uc_lastblock == 0) && (uc_step_cycling == NEXBLOCK_REQUEST)) {
+						if ((suc_lastblock == 0) && (suc_step_cycling == NEXBLOCK_REQUEST)) {
 
 						} else {
-							uc_step_cycling++;
-							ul_timer_next_cycle = sul_dlms_time_between_msg      ;
+							suc_step_cycling++;
+							sul_timer_next_cycle = sul_dlms_time_between_msg      ;
 							LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: Waiting next cycle\r\n"));
 						}
 
-						if (uc_step_cycling == NUM_STEPS) {
-							_log_S02_Status(ul_cycles_counter, us_node_cycling);
-							_print_result_test(us_node_cycling, uc_step_cycling, uc_error, ul_cycles_counter);
-							uc_step_cycling = 0;
-							us_node_cycling++;
+						if (suc_step_cycling == NUM_STEPS) {
+							_log_S02_Status(sul_cycles_counter, sus_node_cycling);
+							_print_result_test(sus_node_cycling, suc_step_cycling, uc_error, sul_cycles_counter);
+							suc_step_cycling = 0;
+							sus_node_cycling++;
 						}
 					}
 				}
 			} else {
-				ul_total_time_cycle = _get_time_ms() - ul_start_time_cycle;
-				_log_full_cycles_time(ul_cycles_counter, ul_total_time_cycle);
-				ul_cycles_counter++;
+				sul_total_time_cycle = _get_time_ms() - sul_start_time_cycle;
+				_log_full_cycles_time(sul_cycles_counter, sul_total_time_cycle);
+				sul_cycles_counter++;
 				LOG_APP_DEBUG(("[DLMS_EMU] dlms_emu_process: SC_TIME_NEXT_CYCLE\r\n"));
 
 				if (sb_enable_preq_cycles) {
 					/* Get Path Nodes Info before each complete cycle */
-					us_num_path_nodes = 0;
+					net_Info.us_num_path_nodes = 0;
 					st_sort_cycles = SC_PATH_REQUEST_LIST;
 				} else {
 					/* Next Cycles */
-					us_num_registered_nodes = app_update_registered_nodes(&px_node_list);
+					net_Info.us_num_nodes = adp_mng_update_registered_nodes(&spx_node_list);
 					st_sort_cycles = SC_TIME_NEXT_CYCLE;
-					ul_timer_next_cycle = sul_dlms_time_between_cycles;
+					sul_timer_next_cycle = sul_dlms_time_between_cycles;
 				}
 			}
 		}
@@ -1176,8 +1000,9 @@ void dlms_emu_join_node(uint8_t *puc_extended_address, uint16_t us_short_address
 
 	if (sb_enable_preq_cycles) {
 		/* Restart timer */
-		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+		sul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
 	}
+
 
 }
 
@@ -1197,7 +1022,7 @@ void dlms_emu_leave_node(uint16_t us_short_address)
 
 	if (sb_enable_preq_cycles) {
 		/* Restart timer */
-		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+		sul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
 	}
 }
 
@@ -1212,7 +1037,7 @@ void dlms_emu_data_ind_handler(void *pvDataIndication)
 
 	if (sb_enable_preq_cycles) {
 		/* Restart timer */
-		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+		sul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
 	}
 
 }
@@ -1226,21 +1051,23 @@ void dlms_emu_path_node_cfm(struct TAdpPathDiscoveryConfirm *pPathDiscoveryConfi
 	if (sb_enable_preq_cycles) {
 		struct TAdpPathDiscoveryConfirm *px_path_node;
 
-		/* Use us_num_path_nodes as index of the path table */
-		px_path_node = &sx_path_nodes[us_num_path_nodes];
+		/* Use net_Info.us_num_path_nodes as index of the path table */
+		px_path_node = &sx_path_nodes[net_Info.us_num_path_nodes];
 
 		/* Update PATH info */
 		memcpy(px_path_node, pPathDiscoveryConfirm, sizeof(struct TAdpPathDiscoveryConfirm));
 
-
 		/* Reset PREQ waiting timer */
-		ul_timer_wait_path_cfm = 0;
+		sul_timer_wait_path_cfm = 0;
 
 		/* Update next node */
-		us_num_path_nodes++;
+		net_Info.us_num_path_nodes++;
+
+		/* Update JSON object */
+		dlms_emu_report_json_obj(&net_Info);
 
 		/* Restart timer */
-		ul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
+		sul_timer_max_to_req_paths = sul_dlms_time_between_preq_no_dlms;
 	} else {
 		(void)pPathDiscoveryConfirm;
 	}

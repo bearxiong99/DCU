@@ -6,6 +6,7 @@
 #include <MacApi.h>
 #include <MacDefs.h>
 #include <AdpMacInterface.h>
+#include <Config.h>
 
 #define LOG_LEVEL LOG_LEVEL_ADP
 #include <common/Logger.h>
@@ -481,7 +482,7 @@ bool EAP_PSK_Decode_Message2(
     //x_status = (enum EMacStatus)AdpMac_GetMibSync(MAC_PIB_MANUF_BAND_INFORMATION, 0, &x_pib_value);
 
 	//if (x_status != MAC_STATUS_SUCCESS){
-		x_pib_value.m_au8Value[0] = BAND_CENELEC_A;
+		x_pib_value.m_au8Value[0] = WORK_BAND;
 	//}
     
     if (x_pib_value.m_au8Value[0] == BAND_ARIB) {

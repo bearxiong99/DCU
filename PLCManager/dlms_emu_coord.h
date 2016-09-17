@@ -1,7 +1,11 @@
 #ifndef DLMS_EMU_COORD_H_INCLUDED
 #define DLMS_EMU_COORD_H_INCLUDED
 
+#include <stdint.h>
+#include <stdio.h>
+
 #include "config.h"
+
 
 /* --- DEFINE APP BEHAVIOUR --- */
 /* Adapt DLMS EMU start cycles dynamically to network stability. Always before the TIMER_WAITING_START has expired */
@@ -73,7 +77,7 @@
 //#define TIMER_BETWEEN_MESSAGES                1
 
 /* Time to wait before start cycling in SECONDS (approx. 60 sec per device) */
-//#define TIMER_WAITING_START                   12000 /* 2 minutes */
+//#define TIMER_WAITING_START                   120 /* 2 minutes */
 
 /* Time max PATH REQ cfm in SECONDS (only in case of uncomment DLMS_EMU_ENABLE_PATH_REQ) */
 //#define TIME_MAX_WAIT_PREQ_CFM                120 /* 2 min */
@@ -86,6 +90,14 @@ typedef struct x_node_list{
 	uint16_t us_short_address;
 	uint8_t puc_extended_address[8];
 } x_node_list_t;
+
+typedef struct x_net_info {
+	uint8_t *puc_extended_addr;
+	uint16_t us_num_nodes;
+	uint16_t us_num_path_nodes;
+	x_node_list_t *px_node_list;
+	struct TAdpPathDiscoveryConfirm *px_path_nodes;
+} x_net_info_t;
 
 void dlms_emu_init(uint8_t *puc_ext_addr);
 void dlms_emu_update(void);
