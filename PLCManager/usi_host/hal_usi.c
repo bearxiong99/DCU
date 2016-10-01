@@ -243,8 +243,12 @@ static uint8_t _usi_prot_id2idx(usi_protocol_t protocol_id)
 		uc_prot_idx = 8;
 		break;
 
-	case PROTOCOL_INTERNAL:
+	case PROTOCOL_NET_INFO_G3:
 		uc_prot_idx = 9;
+		break;
+
+	case PROTOCOL_INTERNAL:
+		uc_prot_idx = 10;
 		break;
 
 	default:
@@ -273,7 +277,7 @@ static uint8_t _process_msg(uint8_t *puc_rx_buf)
 
 	/* Extract length */
 	if ((uc_type == PROTOCOL_PRIME_API) || (uc_type == PROTOCOL_MAC_G3) ||
-	    (uc_type == PROTOCOL_ADP_G3) || (uc_type == PROTOCOL_COORD_G3)) {
+	    (uc_type == PROTOCOL_ADP_G3) || (uc_type == PROTOCOL_COORD_G3) || (uc_type == PROTOCOL_NET_INFO_G3)) {
 		/* Extract LEN using XLEN */
 		us_len = XLEN_PROTOCOL(puc_rx_buf[LEN_PROTOCOL_HI_OFFSET], puc_rx_buf[LEN_PROTOCOL_LO_OFFSET], puc_rx_buf[XLEN_PROTOCOL_OFFSET]);
 	} else {
@@ -317,6 +321,7 @@ static uint8_t _process_msg(uint8_t *puc_rx_buf)
 	case PROTOCOL_ADP_G3:
 	case PROTOCOL_COORD_G3:
 	case PROTOCOL_PRIME_API:
+	case PROTOCOL_NET_INFO_G3:
 	case PROTOCOL_INTERNAL:
 		pf_serialization_function = usi_cfg_map_protocols[_usi_prot_id2idx((usi_protocol_t)uc_type)].serialization_function;
 		if (pf_serialization_function) {
@@ -422,6 +427,7 @@ static uint8_t _doEoMsg(uint8_t *puc_rx_buf, uint16_t us_msg_size)
 		break;
 
 	case PROTOCOL_PRIME_API:
+	case PROTOCOL_NET_INFO_G3:
 		/* Get received CRC 8: use XLEN */
 		us_len = XLEN_PROTOCOL(puc_rx_buf[LEN_PROTOCOL_HI_OFFSET], puc_rx_buf[LEN_PROTOCOL_LO_OFFSET], puc_rx_buf[XLEN_PROTOCOL_OFFSET]);
 		puc_tb = &puc_rx_buf[us_msg_size - 1];
@@ -529,7 +535,7 @@ static usi_status_t _usi_encode_and_send(x_usi_cmd_t *msg)
 	/* Adjust XLEN if uc_p_type is internal protocol */
 	uc_cmd = msg->puc_buf[0];
 	if ((uc_p_type == PROTOCOL_PRIME_API) || (uc_p_type == PROTOCOL_MAC_G3) ||
-	    (uc_p_type == PROTOCOL_ADP_G3) || (uc_p_type == PROTOCOL_COORD_G3)) {
+	    (uc_p_type == PROTOCOL_ADP_G3) || (uc_p_type == PROTOCOL_COORD_G3) || (uc_p_type == PROTOCOL_NET_INFO_G3)) {
 		puc_tx_buf[0] = LEN_EX_PROTOCOL(us_len) + CMD_PROTOCOL(uc_cmd);
 	}
 
@@ -574,6 +580,7 @@ static usi_status_t _usi_encode_and_send(x_usi_cmd_t *msg)
 		break;
 
 	case PROTOCOL_PRIME_API:
+	case PROTOCOL_NET_INFO_G3:
 	default:
 		ul_crc = hal_pcrc_calc(&puc_tx_buf_ini[ul_idx_in_orig + 1], msg->us_len + 2, HAL_PCRC_HT_USI, HAL_PCRC_CRC_TYPE_8, false);
 		*puc_tx_buf++ = (uint8_t)(ul_crc);
@@ -804,6 +811,7 @@ static bool _check_integrity_len(uint8_t *puc_rx_start, uint16_t us_msg_len)
 
 	/* Length is up to 2Kb ... use XLEN field */
 	case PROTOCOL_PRIME_API:
+	case PROTOCOL_NET_INFO_G3:
 		/* Get received CRC 8: use XLEN */
 		us_len = XLEN_PROTOCOL(puc_data[LEN_PROTOCOL_HI_OFFSET], puc_data[LEN_PROTOCOL_LO_OFFSET], puc_data[XLEN_PROTOCOL_OFFSET]);
 		us_len++;

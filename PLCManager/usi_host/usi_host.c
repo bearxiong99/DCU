@@ -1,12 +1,12 @@
 #include "hal_utils.h"
 
-#include "ifaceAdp_api.h"
+#include "ifaceNet_api.h"
 #include "ifaceSniffer.h"
 
 void usi_host_init()
 {
 	hal_usi_init();
-	ifaceAdp_api_init();
+	ifaceNetInfo_api_init();
 	ifaceSniffer_init();
 }
 
@@ -33,11 +33,6 @@ usi_status_t usi_host_send_cmd(void *msg)
 void usi_host_loopback(int _fd_redirect)
 {
 	hal_usi_loopback(_fd_redirect);
-}
-
-void usi_host_select_api(uint8_t app_id)
-{
-	ifaceAdp_select_api(app_id);
 }
 
 void usi_host_set_sniffer_cb(void (*sap_handler)(uint8_t* msg, uint16_t len))

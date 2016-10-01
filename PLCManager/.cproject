@@ -60,8 +60,9 @@
 						</toolChain>
 					</folderInfo>
 					<fileInfo id="cdt.managedbuild.config.gnu.cross.exe.debug.1819232716.47610366" name="dlms_emu_report.h" rcbsApplicability="disable" resourcePath="dlms_emu_report.h" toolsToInvoke=""/>
+					<fileInfo id="cdt.managedbuild.config.gnu.cross.exe.debug.1819232716.180246233" name="xml_rep.h" rcbsApplicability="disable" resourcePath="xml_rep.h" toolsToInvoke=""/>
 					<sourceEntries>
-						<entry excluding="usi_host/prime" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="Config.h|xml_rep.h|xml_rep.c|dlms_emu_report.h|dlms_emu_report.c|usi_host/prime" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

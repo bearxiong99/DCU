@@ -39,13 +39,14 @@ typedef enum {
 	PROTOCOL_ADP_G3                   = 0x25,
 	PROTOCOL_COORD_G3                 = 0x26,
 	PROTOCOL_PRIME_API                = 0x30,
+	PROTOCOL_NET_INFO_G3              = 0x31,
 	PROTOCOL_INTERNAL                 = 0x3F,
 	PROTOCOL_USER_DEFINED             = 0xFE,
 	PROTOCOL_INVALID                  = 0xFF
 } usi_protocol_t;
 
 /** Number of USI supported protocols */
-#define USI_NUMBER_OF_PROTOCOLS            10
+#define USI_NUMBER_OF_PROTOCOLS            11
 /** Invalid protocol index */
 #define USI_INVALID_PROTOCOL_IDX           0xFF
 

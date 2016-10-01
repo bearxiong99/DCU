@@ -29,7 +29,7 @@
 
 #include "socket_handler.h"
 #include "plcmanager.h"
-#include "app_adp_mng.h"
+#include "net_info_mng.h"
 #include "app_debug.h"
 #include "http_mng.h"
 #include "sniffer.h"
@@ -49,14 +49,7 @@ int main(int argc, char** argv)
 {
 	socket_res_t i_socket_res;
 	int pi_usi_fds;
-#if BOARD == BOARD_SAMA5EK
-	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200};
-#elif BOARD == BOARD_ARIA
-	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200}; //{"/dev/ttyS0", 115200};
-#else
-	error No board defined
-#endif
-
+	x_serial_args_t serial_args = {"/dev/ttyUSB1", 115200}; //{"/dev/ttyS0", 115200};
 
 	PRINTF_INIT();
 
@@ -74,9 +67,9 @@ int main(int argc, char** argv)
 	}
 
 	/* Open ADP internal server socket */
-	i_socket_res =  socket_create_server(PLC_MNG_DLMS_APP_ID, INADDR_ANY, PLC_MNG_DLMS_APP_PORT);
+	i_socket_res =  socket_create_server(PLC_MNG_NET_INFO_APP_ID, INADDR_ANY, PLC_MNG_NET_INFO_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF("Cannot open DLMSoTCP internal Server socket.");
+		PRINTF("Cannot open Net Info Manager internal Server socket.");
 		exit(-1);
 	}
 
@@ -103,10 +96,10 @@ int main(int argc, char** argv)
 	/* Init Sniffer APP : Serve to SNIFFER tool. */
 	sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
 
-	/* Register DLMS internal APP callback */
-	app_cbs[PLC_MNG_DLMS_APP_ID] = adp_mng_callback;
+	/* Register Net Info Manager APP callback */
+	app_cbs[PLC_MNG_NET_INFO_APP_ID] = net_info_mng_callback;
 	/* Init CLI app */
-	adp_mng_init(PLC_MNG_DLMS_APP_ID);
+	net_info_mng_init(PLC_MNG_NET_INFO_APP_ID);
 
 	/* Register HTTP internal NODE APP callback */
 	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
@@ -125,7 +118,7 @@ int main(int argc, char** argv)
 					/* Process USI */
 					usi_host_process();
 					//http_mng_send_cmd();
-					adp_mng_process();
+					net_info_mng_process();
 					break;
 
 				case SOCKET_ERROR:
@@ -140,7 +133,7 @@ int main(int argc, char** argv)
 					if (socket_evet_info.i_app_id == PLC_MNG_USI_APP_ID) {
 						/* Process USI */
 						usi_host_process();
-						adp_mng_process();
+						//net_info_mng_process();
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {
