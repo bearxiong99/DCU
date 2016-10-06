@@ -7,16 +7,11 @@
 
 #include "hal_utils.h"
 
-// Known message ids
-enum ESerialMessageId {
-	NET_INFO_GET_REQUEST = 0x01,
+/* buffer used to usi serialization */
+static uint8_t spuc_serial_if_buf[32];
 
-	NET_INFO_GET_REQUEST_CFM = 0x40,
-	NET_INFO_EVENT_INDICATION,
-};
-
-/* buffer used to serialization */
-static uint8_t spuc_serial_buf[32];
+/* buffer used to web serialization */
+static uint8_t spuc_web_if_buf[32];
 
 /* USI Cmd */
 x_usi_cmd_t sx_net_info_msg;
@@ -48,6 +43,10 @@ static uint8_t _net_info_event_indication(uint8_t *px_msg, uint16_t us_len)
 	net_info_event_ind_t net_info_event_ind;
 	uint8_t* ptr_info;
 
+	if (us_len == 0) {
+		return false;
+	}
+
 	ptr_info = px_msg;
 
 	net_info_event_ind.uc_event_id = *ptr_info++;
@@ -73,11 +72,11 @@ static uint8_t ifaceNetInfo_api_ReceivedCmd(uint8_t *px_msg, uint16_t us_len)
     us_size_msg = us_len - 1;
 
     switch (uc_cmd) {
-    case NET_INFO_GET_REQUEST_CFM:
-        return _net_info_get_cfm(puc_ptr);
-        break;
-    case NET_INFO_EVENT_INDICATION:
+    case NET_INFO_EVENT_IND:
         return _net_info_event_indication(puc_ptr, us_size_msg);
+        break;
+    case NET_INFO_RSP_GET_ID:
+        return _net_info_get_cfm(puc_ptr);
         break;
     default:
         return false;
@@ -91,6 +90,11 @@ void ifaceNetInfo_api_init(void)
 
     /* register to USI callback */
     hal_usi_set_callback(PROTOCOL_NET_INFO_G3, ifaceNetInfo_api_ReceivedCmd);
+
+    /* Set USI data to send messages */
+    sx_net_info_msg.uc_p_type = PROTOCOL_NET_INFO_G3;
+    sx_net_info_msg.puc_buf = spuc_serial_if_buf;
+    sx_net_info_msg._fd = -1;
 }
 
 void NetInfoSetCallbacks(net_info_callbacks_t *pf_net_info_callback)
@@ -103,15 +107,31 @@ void NetInfoGetRequest(uint8_t uc_id)
     uint8_t *puc_msg;
 
     /* Insert parameters */
-    puc_msg = spuc_serial_buf;
+    puc_msg = spuc_serial_if_buf;
 
-    *puc_msg++ = NET_INFO_GET_REQUEST;
+    *puc_msg++ = NET_INFO_CMD_GET_ID;
     *puc_msg++ = uc_id;
 
     /* Send to USI */
-    sx_net_info_msg.uc_p_type = PROTOCOL_NET_INFO_G3;
-    sx_net_info_msg.us_len = puc_msg - spuc_serial_buf;
-    sx_net_info_msg._fd = -1;
+    sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
+
+    hal_usi_send_cmd(&sx_net_info_msg);
+
+}
+
+void NetInfoGetPathRequest(uint16_t us_short_address)
+{
+    uint8_t *puc_msg;
+
+    /* Insert parameters */
+    puc_msg = spuc_serial_if_buf;
+
+    *puc_msg++ = NET_INFO_CMD_GET_PATH_REQ;
+    *puc_msg++ = (uint8_t)(us_short_address >> 8);
+    *puc_msg++ = (uint8_t)us_short_address;
+
+    /* Send to USI */
+    sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
 
     hal_usi_send_cmd(&sx_net_info_msg);
 

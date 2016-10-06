@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 {
 	socket_res_t i_socket_res;
 	int pi_usi_fds;
-	x_serial_args_t serial_args = {"/dev/ttyUSB1", 115200}; //{"/dev/ttyS0", 115200};
+	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200}; //{"/dev/ttyS0", 115200};
 
 	PRINTF_INIT();
 
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
 					if (socket_evet_info.i_app_id == PLC_MNG_USI_APP_ID) {
 						/* Process USI */
 						usi_host_process();
-						//net_info_mng_process();
+						net_info_mng_process();
 					} else {
 						/* Launch APP callback */
 						if (app_cbs[socket_evet_info.i_app_id] != NULL) {
