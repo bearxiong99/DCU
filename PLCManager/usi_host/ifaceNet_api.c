@@ -18,6 +18,14 @@ x_usi_cmd_t sx_net_info_msg;
 
 static net_info_callbacks_t sx_net_info_cbs;
 
+static uint8_t _net_info_get_cdata(uint8_t *px_msg)
+{
+	if (sx_net_info_cbs.coordinator_data) {
+		sx_net_info_cbs.coordinator_data((net_info_cdata_cfm_t *)px_msg);
+	}
+
+    return true;
+}
 
 static uint8_t _net_info_get_cfm(uint8_t *px_msg)
 {
@@ -78,6 +86,9 @@ static uint8_t ifaceNetInfo_api_ReceivedCmd(uint8_t *px_msg, uint16_t us_len)
     case NET_INFO_RSP_GET_ID:
         return _net_info_get_cfm(puc_ptr);
         break;
+    case NET_INFO_RSP_CDATA_ID:
+        return _net_info_get_cdata(puc_ptr);
+        break;
     default:
         return false;
         break;
@@ -129,6 +140,22 @@ void NetInfoGetPathRequest(uint16_t us_short_address)
     *puc_msg++ = NET_INFO_CMD_GET_PATH_REQ;
     *puc_msg++ = (uint8_t)(us_short_address >> 8);
     *puc_msg++ = (uint8_t)us_short_address;
+
+    /* Send to USI */
+    sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
+
+    hal_usi_send_cmd(&sx_net_info_msg);
+
+}
+
+void NetInfoCoordinatorData(void)
+{
+    uint8_t *puc_msg;
+
+    /* Insert parameters */
+    puc_msg = spuc_serial_if_buf;
+
+    *puc_msg++ = NET_INFO_CMD_GET_COORD_DATA;
 
     /* Send to USI */
     sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;

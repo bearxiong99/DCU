@@ -5,14 +5,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include "net_info_report.h"
 
 static char spuc_conf_name[20];
-static char spuc_tmp_name[50];
-static char spuc_file_name[50];
-static char spuc_netroutes_tmp_name[] = "/tmp/netroutes.json";
-static char spuc_netroutes_name[] = "/home/DCWeb/public/tables/netroutes.json";
+//static char spuc_tmp_name[50];
+//static char spuc_file_name[50];
+//static char spuc_netroutes_tmp_name[] = "/tmp/netroutes.json";
+//static char spuc_netroutes_name[] = "/home/DCWeb/public/tables/netroutes.json";
 
 static char spuc_netlist_tmp_name[] = "/tmp/netlist.json";
 static char spuc_netlist_name[] = "/home/DCWeb/public/tables/netlist.json";
@@ -20,12 +21,27 @@ static char spuc_netlist_name[] = "/home/DCWeb/public/tables/netlist.json";
 static char spuc_blacklist_tmp_name[] = "/tmp/blacklist.json";
 static char spuc_blacklist_name[] = "/home/DCWeb/public/tables/blacklist.json";
 
-static char spuc_pathinfo_tmp_name[] = "/tmp/pathinfo.json";
-static char spuc_pathinfo_name[] = "/home/DCWeb/public/tables/pathinfo.json";
+static char spuc_pathlist_tmp_name[] = "/tmp/pathlist.json";
+static char spuc_pathlist_name[] = "/home/DCWeb/public/tables/pathlist.json";
+
+//static char spuc_nodesinfo_path[] = "/home/DCWeb/public/tables/nodes/";
 
 static const char sc_comillas = '"';
 
-static void mov_file(char *_src_path, char *_dst_path)
+//static uint16_t _extract_u16(void *vptr_value) {
+//	uint16_t us_val_swap;
+//	uint8_t uc_val_tmp;
+//
+//	uc_val_tmp = *(uint8_t *)vptr_value;
+//	us_val_swap = (uint16_t)uc_val_tmp;
+//
+//	uc_val_tmp = *((uint8_t *)vptr_value + 1);
+//	us_val_swap += ((uint16_t)uc_val_tmp) << 8;
+//
+//	return us_val_swap;
+//}
+
+static void _mov_file(char *_src_path, char *_dst_path)
 {
 	int src_fd, dst_fd;
 	char c;
@@ -41,6 +57,76 @@ static void mov_file(char *_src_path, char *_dst_path)
 	remove(_src_path);
 	chmod(_dst_path, 0777);
 }
+
+//static void _add_to_file(char *_src_name, int dst_fd)
+//{
+//	char puc_ln_path[50];
+//	int i_ln_len;
+//	int src_fd;
+//	char c;
+//
+//	i_ln_len = sprintf(puc_ln_path, "%s%s", spuc_nodesinfo_path, _src_name);
+//
+//	src_fd = open(puc_ln_path, O_RDONLY);
+//	while(read(src_fd, &c, sizeof(c) != 0)){
+//		write(dst_fd, &c ,sizeof(c));
+//	}
+//	close(src_fd);
+//}
+//
+//static void _build_pathinfo(void)
+//{
+//	char puc_ln_buf[96];
+//	int i_ln_len, i_size_fd;
+//	DIR *dir;
+//	struct dirent *ent;
+//	int dst_fd;
+//
+//	dir = opendir (spuc_nodesinfo_path);
+//
+//	dst_fd = creat(spuc_pathlist_tmp_name, O_RDWR);
+//
+//	if (dir == NULL) {
+//		printf("No puedo abrir el directorio");
+//		return;
+//	}
+//
+//	/* Append Nodes data */
+//	i_ln_len = sprintf(puc_ln_buf, "{\r\n%cnodes%c:[\r\n", sc_comillas, sc_comillas);
+//	i_size_fd = write(dst_fd, puc_ln_buf, i_ln_len);
+//
+//	while ((ent = readdir (dir)) != NULL) {
+//		if (strncmp(ent->d_name, "node_", 5) == 0) {
+//			_add_to_file(ent->d_name, dst_fd);
+//		}
+//	}
+//	closedir (dir);
+//
+//	 // remove last semicolon
+//	close(dst_fd);
+//	dst_fd = open(spuc_pathlist_tmp_name, O_RDWR);
+//	lseek(dst_fd, 4, SEEK_END);
+//	i_ln_len = sprintf(puc_ln_buf, "\r\n]\r\n%clinks%c:[\r\n", sc_comillas, sc_comillas);
+//	i_size_fd = write(dst_fd, puc_ln_buf, i_ln_len);
+//
+//	dir = opendir (spuc_nodesinfo_path);
+//	/* Append NodeLinks data */
+//	while ((ent = readdir (dir)) != NULL) {
+//		if (strncmp(ent->d_name, "nodelink_", 5) == 0) {
+//			_add_to_file(ent->d_name, dst_fd);
+//		}
+//	}
+//	closedir (dir);
+//
+//	// remove last semicolon
+//	close(dst_fd);
+//	dst_fd = open(spuc_pathlist_tmp_name, O_RDWR);
+//	lseek(dst_fd, 4, SEEK_END);
+//	i_ln_len = sprintf(puc_ln_buf, "\r\n]\r\n}");
+//	i_size_fd = write(dst_fd, puc_ln_buf, i_ln_len);
+//
+//	close(dst_fd);
+//}
 
 void net_info_report_init(void)
 {
@@ -111,49 +197,50 @@ void net_info_report_init(void)
 //		close(csv_fd);
 //
 //		/* Move temporal file to FTP folder */
-//		mov_file(spuc_tmp_name, spuc_file_name);
+//		_mov_file(spuc_tmp_name, spuc_file_name);
 //	}
 //}
 //
 
-//int net_info_report_net_topology(x_net_info_t *net_info)
-//{
-//	int json_fd;
-//	char puc_ln_buf[100];
-//	int i_ln_len, i_size_fd;
-//	uint8_t *ptr_mac;
-//	x_node_list_t *px_node;
-//	struct TAdpPathDiscoveryConfirm *px_path;
-//	uint8_t uc_idx;
-//	uint16_t us_path_idx;
-//	uint8_t uc_hops;
-//	uint8_t puc_ext_addr[24];
-//
-//	printf ("JSON obj creating...\r\n");
-//
-//	json_fd = open(spuc_json_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);;
-//
-//	i_ln_len = sprintf(puc_ln_buf, "{\r\n  %cnodes%c:[\r\n", sc_comillas, sc_comillas);
-//	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
-//
-//	memset(puc_ext_addr, 0, sizeof(puc_ext_addr));
-//	uc_hops = 0;
-//
-//	/* First Node is Coordinator */
-//	ptr_mac = net_info->puc_extended_addr;
-//	sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *(ptr_mac + 7), *(ptr_mac + 6), *(ptr_mac + 5),
-//					*(ptr_mac + 4), *(ptr_mac + 3), *(ptr_mac + 2), *(ptr_mac + 1), *ptr_mac);
-//
-//	i_ln_len = sprintf(puc_ln_buf, "    {%cu16Addr%c:%c0%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
-//			sc_comillas, sc_comillas, sc_comillas, sc_comillas,
-//			sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
-//	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-//
-//
-//	/* List of Device Nodes */
-//	for (uc_idx = 0; uc_idx < net_info->us_num_nodes; uc_idx++) {
-//
-//		px_node = (x_node_list_t *)&net_info->px_node_list[uc_idx];
+int net_info_report_pathlist(x_net_info_t *net_info)
+{
+	int json_fd;
+	char puc_ln_buf[100];
+	int i_ln_len, i_size_fd;
+	uint8_t *ptr_mac;
+	x_node_list_t *px_node;
+	x_path_info_t *px_path;
+	uint8_t uc_idx;
+	uint16_t us_path_idx;
+	uint8_t uc_hops;
+	uint8_t puc_ext_addr[24];
+
+	printf ("PATHLIST creating...\r\n");
+
+	json_fd = open(spuc_pathlist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);;
+
+	i_ln_len = sprintf(puc_ln_buf, "{\r\n\t%cnodes%c:[\r\n", sc_comillas, sc_comillas);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	memset(puc_ext_addr, 0, sizeof(puc_ext_addr));
+	uc_hops = 0;
+
+	/* First Node is Coordinator */
+	ptr_mac = net_info->puc_extended_addr;
+	sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *(ptr_mac + 7), *(ptr_mac + 6), *(ptr_mac + 5),
+					*(ptr_mac + 4), *(ptr_mac + 3), *(ptr_mac + 2), *(ptr_mac + 1), *ptr_mac);
+
+	i_ln_len = sprintf(puc_ln_buf, "\t\t{%cu16Addr%c:%c0%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
+			sc_comillas, sc_comillas, sc_comillas, sc_comillas,
+			sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
+	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+
+
+	/* List of Device Nodes */
+	for (uc_idx = 0; uc_idx < net_info->us_num_nodes; uc_idx++) {
+
+		px_node = &net_info->x_node_list[uc_idx];
+		uc_hops = net_info->x_path_info[uc_idx].m_u8ForwardHopsCount;
 //		for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
 //			px_path = (struct TAdpPathDiscoveryConfirm *)&net_info->px_path_nodes[us_path_idx];
 //			if (px_path->m_u16DstAddr == px_node->us_short_address) {
@@ -161,35 +248,60 @@ void net_info_report_init(void)
 //				break;
 //			}
 //		}
-//
-//		ptr_mac = &px_node->puc_extended_address;
-//		sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *ptr_mac, *(ptr_mac + 1), *(ptr_mac + 2),
-//				*(ptr_mac + 3), *(ptr_mac + 4), *(ptr_mac + 5), *(ptr_mac + 6), *(ptr_mac + 7));
-//
-//		i_ln_len = sprintf(puc_ln_buf, "    {%cu16Addr%c:%c%d%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
-//				sc_comillas, sc_comillas, sc_comillas, px_node->us_short_address, sc_comillas,
-//				sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
-//
-//		if (uc_idx == (net_info->us_num_path_nodes - 1)) {
-//			/* Last iteration */
-//			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len - 3); /* remove the last semicolon, CR and LF */
-//		} else {
-//			/* Last iteration */
-//			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-//		}
-//	}
-//
-//	i_ln_len = sprintf(puc_ln_buf, "\r\n  ],\r\n  %clinks%c:[\r\n", sc_comillas, sc_comillas);
-//	write(json_fd, puc_ln_buf, i_ln_len);
-//
-//	/* List Links */
-//	for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
-//		uint16_t us_src, us_dst;
-//		uint8_t uc_hope_idx;
-//
-//		px_path = &net_info->px_path_nodes[us_path_idx];
-//
-//		/* Forward hopes */
+
+		ptr_mac = &px_node->puc_extended_address;
+		sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *ptr_mac, *(ptr_mac + 1), *(ptr_mac + 2),
+				*(ptr_mac + 3), *(ptr_mac + 4), *(ptr_mac + 5), *(ptr_mac + 6), *(ptr_mac + 7));
+
+		i_ln_len = sprintf(puc_ln_buf, "\t\t{%cu16Addr%c:%c%d%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
+				sc_comillas, sc_comillas, sc_comillas, px_node->us_short_address, sc_comillas,
+				sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
+
+		if (uc_idx == (net_info->us_num_nodes - 1)) {
+			/* Last iteration */
+			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len - 3); /* remove the last semicolon, CR and LF */
+		} else {
+			/* Last iteration */
+			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+		}
+	}
+
+	i_ln_len = sprintf(puc_ln_buf, "\r\n\t],\r\n\t%clinks%c:[\r\n", sc_comillas, sc_comillas);
+	write(json_fd, puc_ln_buf, i_ln_len);
+
+	/* List Links */
+	for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
+		uint16_t us_src, us_dst;
+		uint8_t uc_hope_idx, uc_link_cost;
+
+		px_path = &net_info->x_path_info[us_path_idx];
+
+		/* Forward hopes */
+		uc_hope_idx = px_path->m_u8ForwardHopsCount - 1;
+		if (px_path->m_u8ForwardHopsCount == 1) {
+			/* Only one hop -> Src is coordinator address */
+			us_src = 0;
+		} else {
+			/* More than one hop */
+			us_src = px_path->m_aForwardPath[uc_hope_idx - 1].m_u16HopAddress;
+		}
+		us_dst = px_path->m_aForwardPath[uc_hope_idx].m_u16HopAddress;
+		uc_link_cost = px_path->m_aForwardPath[uc_hope_idx].m_u8LinkCost;
+		i_ln_len = sprintf(puc_ln_buf, "\t\t{%csource%c:%d,%ctarget%c:%d,%cvalue%c:%d},\r\n",
+							sc_comillas, sc_comillas, us_src,
+							sc_comillas, sc_comillas, us_dst,
+							sc_comillas, sc_comillas, uc_link_cost);
+
+		if (us_path_idx == (net_info->us_num_path_nodes - 1)) {
+			/* Last iteration */
+			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len - 3); /* remove the last semicolon, CR and LF */
+		} else {
+			/* Next iteration */
+			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+		}
+	}
+
+		/* Print every paths */
 //		us_src = 0;
 //		for (uc_hope_idx = 0; uc_hope_idx < px_path->m_u8ForwardHopsCount; uc_hope_idx++) {
 //			us_dst = px_path->m_aForwardPath[uc_hope_idx].m_u16HopAddress;
@@ -201,8 +313,10 @@ void net_info_report_init(void)
 //
 //			us_src = us_dst;
 //		}
-//
-//		/* Reverse hopes */
+
+		/* !!! NO NEED BECAUSE PATH ARE ALWAYS SYMETRIC */
+
+		/* Print every paths */
 //		us_src = px_path->m_u16OrigAddr;
 //		for (uc_hope_idx = 0; uc_hope_idx < px_path->m_u8ReverseHopsCount; uc_hope_idx++) {
 //			us_dst = px_path->m_aReversePath[uc_hope_idx].m_u16HopAddress;
@@ -222,18 +336,18 @@ void net_info_report_init(void)
 //			us_src = us_dst;
 //		}
 //	}
-//
-//	i_ln_len = sprintf(puc_ln_buf, "\r\n  ]\r\n}");
-//	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-//	close(json_fd);
-//
-//	/* Move temporal file to WebServer folder */
-//	mov_file(spuc_json_tmp_name, spuc_json_name);
-//
-//	printf ("JSON obj created\r\n");
-//
-//	return (i_size_fd);
-//}
+
+	i_ln_len = sprintf(puc_ln_buf, "\r\n\t]\r\n}");
+	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+	close(json_fd);
+
+	/* Move temporal file to WebServer folder */
+	_mov_file(spuc_pathlist_tmp_name, spuc_pathlist_name);
+
+	printf ("PATHLIST created\r\n");
+
+	return (i_size_fd);
+}
 
 int net_info_report_netlist(x_net_info_t *net_info)
 {
@@ -286,7 +400,7 @@ int net_info_report_netlist(x_net_info_t *net_info)
 	close(json_fd);
 
 	/* Move temporal file to WebServer folder */
-	mov_file(spuc_netlist_tmp_name, spuc_netlist_name);
+	_mov_file(spuc_netlist_tmp_name, spuc_netlist_name);
 
 	printf ("NETLIST created\r\n");
 
@@ -295,7 +409,6 @@ int net_info_report_netlist(x_net_info_t *net_info)
 
 int net_info_report_blacklist(x_net_info_t *net_info)
 {
-	x_node_list_t *px_node;
 	uint8_t *ptr_mac;
 	uint16_t us_node_idx;
 	uint8_t puc_ext_addr[24];
@@ -340,7 +453,7 @@ int net_info_report_blacklist(x_net_info_t *net_info)
 	close(json_fd);
 
 	/* Move temporal file to WebServer folder */
-	mov_file(spuc_blacklist_tmp_name, spuc_blacklist_name);
+	_mov_file(spuc_blacklist_tmp_name, spuc_blacklist_name);
 
 	printf ("BLACKLIST created\r\n");
 
@@ -348,58 +461,73 @@ int net_info_report_blacklist(x_net_info_t *net_info)
 }
 
 
-int net_info_report_path_info(uint16_t us_node_addr, uint8_t *path_info)
-{
-	x_node_list_t *px_node;
-	uint8_t *ptr_mac;
-	uint16_t us_node_idx;
-	uint8_t puc_ext_addr[24];
-	char puc_ln_buf[96];
-	int i_ln_len, i_size_fd;
-	int json_fd;
-
-	printf ("PATH INFO updating...\r\n");
-
-	json_fd = open(spuc_pathinfo_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
-
-	us_node_idx = 0;
-
-	i_ln_len = sprintf(puc_ln_buf, "[\r\n");
-	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
-
-	for (us_node_idx = 0; us_node_idx < net_info->us_black_nodes; us_node_idx++) {
-		i_ln_len = sprintf(puc_ln_buf, "\t{\r\n");
-		i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
-
-		i_ln_len = sprintf(puc_ln_buf, "\t\t%cid%c: %u,\r\n", sc_comillas, sc_comillas, us_node_idx);
-		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-
-		ptr_mac = (uint8_t *)&net_info->puc_black_list[us_node_idx][0];
-
-		sprintf(puc_ext_addr, "0x%02X%02X%02X%02X%02X%02X%02X%02X", *ptr_mac, *(ptr_mac + 1), *(ptr_mac + 2),
-				*(ptr_mac + 3), *(ptr_mac + 4), *(ptr_mac + 5), *(ptr_mac + 6), *(ptr_mac + 7));
-
-		i_ln_len = sprintf(puc_ln_buf, "\t\t%cextended_addr%c: %c%s%c\r\n", sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas);
-		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-
-		if (us_node_idx == (net_info->us_black_nodes - 1)) {
-			/* last one -> close json object */
-			i_ln_len = sprintf(puc_ln_buf, "\t}\r\n]");
-		} else {
-			i_ln_len = sprintf(puc_ln_buf, "\t},\r\n");
-		}
-		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-
-	}
-
-	close(json_fd);
-
-	/* Move temporal file to WebServer folder */
-	mov_file(spuc_blacklist_tmp_name, spuc_pathinfo_tmp_name);
-
-	printf ("PATH INFO updated\r\n");
-
-	return (i_size_fd);
-}
+//int net_info_report_path_info(uint16_t us_node_addr, uint8_t *ptr_ext, x_path_info_t *path_info)
+//{
+//	uint8_t puc_ext_addr[24];
+//	char puc_ln_buf[96];
+//	int i_ln_len, i_size_fd;
+//	int json_fd;
+//	char spuc_nodeinfo_name[50];
+//	uint16_t us_src, us_dst;
+//	uint8_t uc_hope_idx;
+//
+//	printf ("NODE INFO updating...\r\n");
+//
+//	/* Write Node Info file */
+//	i_ln_len = sprintf(spuc_nodeinfo_name, "%snode_%u.json", spuc_nodesinfo_path, us_node_addr);
+//
+//	json_fd = open(spuc_nodeinfo_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+//
+//	sprintf(puc_ext_addr, "0x%02X%02X%02X%02X%02X%02X%02X%02X", *ptr_ext, *(ptr_ext + 1), *(ptr_ext + 2),
+//			*(ptr_ext + 3), *(ptr_ext + 4), *(ptr_ext + 5), *(ptr_ext + 6), *(ptr_ext + 7));
+//
+//	i_ln_len = sprintf(puc_ln_buf, "{%cu16Addr%c:%c%u%c,%cu64Addr%c:%c%s%c,%chops%c:%u},\r\n",
+//			sc_comillas, sc_comillas, sc_comillas, us_node_addr, sc_comillas,
+//			sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas,
+//			sc_comillas, sc_comillas, path_info->m_u8ForwardHopsCount);
+//
+//	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+//	close(json_fd);
+//
+//	/* Write Node Routes Info file */
+//	i_ln_len = sprintf(spuc_nodeinfo_name, "%snodelink_%u.json", spuc_nodesinfo_path, us_node_addr);
+//
+//	json_fd = open(spuc_nodeinfo_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+//
+//	/* List Links */
+//	/* Forward hopes */
+//	us_src = 0;
+//	for (uc_hope_idx = 0; uc_hope_idx < path_info->m_u8ForwardHopsCount; uc_hope_idx++) {
+//		us_dst = _extract_u16(&path_info->m_aForwardPath[uc_hope_idx].m_u16HopAddress);
+//		i_ln_len = sprintf(puc_ln_buf, "{%csource%c:%d,%ctarget%c:%d,%cvalue%c:%d},\r\n",
+//				sc_comillas, sc_comillas, us_src,
+//				sc_comillas, sc_comillas, us_dst,
+//				sc_comillas, sc_comillas, path_info->m_aForwardPath[uc_hope_idx].m_u8LinkCost);
+//		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+//
+//		us_src = us_dst;
+//	}
+//
+//	/* Reverse hopes */
+//	us_src = _extract_u16(&path_info->m_u16OrigAddr);
+//	for (uc_hope_idx = 0; uc_hope_idx < path_info->m_u8ReverseHopsCount; uc_hope_idx++) {
+//		us_dst = _extract_u16(&path_info->m_aReversePath[uc_hope_idx].m_u16HopAddress);
+//		i_ln_len = sprintf(puc_ln_buf, "{%csource%c:%d,%ctarget%c:%d,%cvalue%c:%d},\r\n",
+//				sc_comillas, sc_comillas, us_src,
+//				sc_comillas, sc_comillas, us_dst,
+//				sc_comillas, sc_comillas, path_info->m_aForwardPath[uc_hope_idx].m_u8LinkCost);
+//		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+//
+//		us_src = us_dst;
+//	}
+//
+//	close(json_fd);
+//
+//	printf ("NODE INFO updated\r\n");
+//
+//	_build_pathinfo();
+//
+//	return (i_size_fd);
+//}
 
 
