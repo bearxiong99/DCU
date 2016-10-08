@@ -26,8 +26,10 @@ static unsigned char suc_net_info_buf[MAX_NET_INFO_SOCKET_SIZE];
 
 static net_info_cdata_cfm_t sx_coord_data;
 static x_net_info_t sx_net_info;
-static uint16_t sus_node_idx_path_req;
-static bool sb_pending_path_cfm;
+static x_routes_info_t sx_routes_info;
+
+static uint16_t sus_node_addr_path_req;
+static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
 
 
@@ -42,6 +44,20 @@ static uint32_t sul_waiting_preq_timer;
 /* Statistics */
 static uint32_t sul_preq_requests;
 
+static void _start_preq_next_request(void)
+{
+	sb_pending_preq_cfm = true;
+	sul_waiting_preq_timer = TIMER_TO_REQ_PATH_INFO;
+	printf("_start_preq_next_request (node 0x%04x)\r\n", sus_node_addr_path_req);
+}
+
+static void _cancel_preq_next_request(void)
+{
+	sb_pending_preq_cfm = false;
+	sul_waiting_preq_timer = 0;
+	printf("_cancel_preq_next_request\r\n");
+}
+
 static uint16_t _extract_u16(void *vptr_value) {
 	uint16_t us_val_swap;
 	uint8_t uc_val_tmp;
@@ -55,47 +71,93 @@ static uint16_t _extract_u16(void *vptr_value) {
 	return us_val_swap;
 }
 
+static uint16_t _get_node_idx_from_node_address(uint16_t us_node_addr)
+{
+	uint16_t us_node_idx;
+
+	for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
+		if (sx_net_info.x_node_list[us_node_idx].us_short_address == us_node_addr) {
+			return us_node_idx;
+		}
+	}
+
+	return INVALID_NODE_ADDRESS;
+}
+
+static uint16_t _get_node_idx_from_routes(uint16_t us_path_idx)
+{
+	uint8_t *puc_ext_addr;
+	uint8_t *puc_ext_addr2;
+	uint16_t us_node_idx;
+
+	puc_ext_addr = &sx_routes_info.puc_ext_addr[us_path_idx][0];
+
+	for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
+		puc_ext_addr2 = sx_net_info.x_node_list[us_node_idx].puc_extended_address;
+		if (memcmp(puc_ext_addr, puc_ext_addr2, EXT_ADDRESS_SIZE) == 0) {
+			return us_node_idx;
+		}
+	}
+
+	return INVALID_NODE_ADDRESS;
+}
+
+static uint16_t _get_path_idx_from_netinfo(uint16_t us_node_idx)
+{
+	uint8_t *puc_ext_addr;
+	uint8_t *puc_ext_addr2;
+	uint16_t us_path_idx;
+	uint16_t us_first_available;
+
+	if (sx_net_info.us_num_path_nodes == 0) {
+		return 0;
+	}
+
+	puc_ext_addr = sx_net_info.x_node_list[us_node_idx].puc_extended_address;
+
+	us_first_available = INVALID_NODE_ADDRESS;
+
+	for (us_path_idx = 0; us_path_idx < NUM_MAX_NODES; us_path_idx++) {
+		if ((sx_routes_info.b_path_is_valid[us_path_idx] == false) && (us_first_available == INVALID_NODE_ADDRESS)) {
+			/* Available to new path info */
+			us_first_available = us_path_idx;
+		}
+		/* Compare with Extended address */
+		puc_ext_addr2 = &sx_routes_info.puc_ext_addr[us_path_idx][0];
+		if (memcmp(puc_ext_addr, puc_ext_addr2, EXT_ADDRESS_SIZE) == 0) {
+			/* return path info */
+			return us_path_idx;
+		}
+	}
+
+	/* return first available, error if not available */
+	return us_first_available;
+}
+
 static void _clear_path_info(uint16_t us_node_addr)
 {
 	if (us_node_addr == 0) {
-		/* Init complete network */
-		memset(sx_net_info.x_path_info, 0, sizeof(sx_net_info.x_path_info));;
+		/* Init complete routes info */
+		memset(&sx_routes_info, 0, sizeof(sx_routes_info));
 	} else {
-		uint16_t us_node_idx;
-		uint8_t *puc_ext_addr;
-
-		puc_ext_addr = 0;
+		uint16_t us_node_idx, us_path_idx;
 
 		/* Search Node Idx */
 		for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
 			if (sx_net_info.x_node_list[us_node_idx].us_short_address == us_node_addr) {
 
-				/* decrease if it is valid before and same short address */
-				if (sx_net_info.b_path_is_valid[NUM_MAX_NODES] == true) {
+				/* Get path Idx */
+				us_path_idx = _get_path_idx_from_netinfo(us_node_idx);
+
+				/* Decrease if it is valid before and same short address */
+				if (sx_routes_info.b_path_is_valid[us_path_idx] == true) {
 					sx_net_info.us_num_path_nodes--;
 				}
 
-				sx_net_info.b_path_is_valid[NUM_MAX_NODES] = false;
-				puc_ext_addr = sx_net_info.x_node_list[us_node_idx].puc_extended_address;
-
+				sx_routes_info.b_path_is_valid[us_path_idx] = false;
 				break;
 			}
 		}
-
-		if (puc_ext_addr) {
-			uint8_t *puc_ext_addr2;
-
-			/* Check if there is other node with same ext address */
-			for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
-				puc_ext_addr2 = sx_net_info.x_node_list[us_node_idx].puc_extended_address;
-				if (memcmp(puc_ext_addr, puc_ext_addr2, 8) == 0) {
-					sx_net_info.b_path_is_valid[us_node_idx] = false;
-					sx_net_info.us_num_path_nodes--;
-					break;
-				}
-			}
-		}
-
 	}
 }
 
@@ -182,7 +244,8 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 		/* In case of path needed -> wait time */
 		if (sx_net_info.us_num_nodes > sx_net_info.us_num_path_nodes) {
-			sul_waiting_preq_timer = TIMER_TO_REQ_PATH_INFO;
+			sus_node_addr_path_req = us_node_addr;
+			_start_preq_next_request();
 		}
 
 	}
@@ -199,14 +262,16 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 	case NET_INFO_UPDATE_PATH_INFO:
 	{
-		uint16_t us_node_addr, us_node_idx;
+		uint16_t us_node_addr, us_node_idx, us_path_idx;
 		uint8_t *puc_ext_addr;
 		x_path_info_t *px_path_info;
 
-		/* Free flag */
-		sb_pending_path_cfm = false;
-
-		us_node_idx = sus_node_idx_path_req;
+		us_node_idx = _get_node_idx_from_node_address(sus_node_addr_path_req);
+		us_path_idx = _get_path_idx_from_netinfo(us_node_idx);
+		if (us_path_idx == INVALID_NODE_ADDRESS) {
+			/* ERROR */
+			break;
+		}
 		us_node_addr = sx_net_info.x_node_list[us_node_idx].us_short_address;
 		puc_ext_addr = &sx_net_info.x_node_list[us_node_idx].puc_extended_address[0];
 
@@ -215,23 +280,24 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 		/* Set path info validation */
 		if ((us_node_idx < NUM_MAX_NODES) && (px_path_info->m_u8Status == 0)) {
-			sx_net_info.b_path_is_valid[us_node_idx] = true;
-			sx_net_info.us_num_path_nodes++;
-			/* Report path node */
-			//net_info_report_path_info(us_node_addr, puc_ext_addr, px_path_info);
+			/* Cancel next programmed request */
+			_cancel_preq_next_request();
+
 			/* Store path info of the node */
-			memcpy(&sx_net_info.x_path_info[us_node_idx], px_path_info, sizeof(x_path_info_t));
-			/* reset values */
-			sus_node_idx_path_req = 0;
-			sul_waiting_preq_timer = 0;
+			memcpy(&sx_routes_info.x_path_info[us_path_idx], px_path_info, sizeof(x_path_info_t));
+			sx_routes_info.b_path_is_valid[us_path_idx] = true;
+			memcpy(&sx_routes_info.puc_ext_addr[us_path_idx][0], puc_ext_addr, EXT_ADDRESS_SIZE);
+			sx_net_info.us_num_path_nodes++;
+
+			/* reset node to request */
+			sus_node_addr_path_req = INVALID_NODE_ADDRESS;
+
 			/* Check JSON update */
 			if (sx_net_info.us_num_nodes == sx_net_info.us_num_path_nodes) {
 				/* Report Pathlist */
-				net_info_report_pathlist(&sx_net_info);
+				net_info_report_pathlist(&sx_net_info, &sx_routes_info);
 			}
-		} else {
-			/* Blocking process to send next PREQ message */
-			sul_waiting_preq_timer = TIMER_TO_REQ_PATH_INFO;
+
 		}
 	}
 		break;
@@ -260,33 +326,23 @@ static void NetInfoCoordData(net_info_cdata_cfm_t *px_cdata)
  */
 void net_info_mng_process(void)
 {
-	if (sul_waiting_preq_timer) {
-		sul_waiting_preq_timer--;
-	}
 
 	if (sul_waiting_cdata_timer) {
 		sul_waiting_cdata_timer--;
 	}
 
-	if (sb_pending_path_cfm || sb_pending_cdata_cfm) {
+	if (sul_waiting_preq_timer) {
+		/* Blocking timer */
+		sul_waiting_preq_timer--;
 		return;
 	}
 
-	if (sx_net_info.us_num_nodes > sx_net_info.us_num_path_nodes) {
-		uint16_t us_node_idx;
-
-		/* Search next node to get path info. Pos 0 is reserved for coord. */
-		for (us_node_idx = 0; us_node_idx < sx_net_info.us_num_nodes; us_node_idx++) {
-			if (sx_net_info.b_path_is_valid[us_node_idx] == false) {
-				sb_pending_path_cfm = true;
-				sus_node_idx_path_req = us_node_idx;
-				NetInfoGetPathRequest(sx_net_info.x_node_list[us_node_idx].us_short_address);
-				sul_preq_requests++;
-				break;
-			}
-		}
-
+	if (sb_pending_preq_cfm) {
+		sul_preq_requests++;
+		NetInfoGetPathRequest(sus_node_addr_path_req);
+		_start_preq_next_request();
 	}
+
 }
 
 /*
@@ -302,6 +358,7 @@ void net_info_mng_init(int _app_id)
 
 	memset(&sx_net_info, 0, sizeof(sx_net_info));
 	memset(&sx_coord_data, 0, sizeof(sx_coord_data));
+	memset(&sx_routes_info, 0, sizeof(sx_routes_info));
 
 	net_info_callbacks.get_confirm = NetInfoGetConfirm;
 	net_info_callbacks.event_indication = NetInfoEventIndication;
@@ -309,9 +366,9 @@ void net_info_mng_init(int _app_id)
 
 	NetInfoSetCallbacks(&net_info_callbacks);
 
-	sb_pending_path_cfm = false;
+	sb_pending_preq_cfm = false;
 	sb_pending_cdata_cfm = false;
-	sus_node_idx_path_req = 0;
+	sus_node_addr_path_req = INVALID_NODE_ADDRESS;
 	sul_waiting_cdata_timer = 0;
 	sul_waiting_preq_timer = 0;
 
@@ -319,7 +376,7 @@ void net_info_mng_init(int _app_id)
 	sul_preq_requests = 0;
 
 	/* reset reports */
-	net_info_report_pathlist(&sx_net_info);
+	net_info_report_pathlist(&sx_net_info, &sx_routes_info);
 
 }
 

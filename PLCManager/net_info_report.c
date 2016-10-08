@@ -202,7 +202,7 @@ void net_info_report_init(void)
 //}
 //
 
-int net_info_report_pathlist(x_net_info_t *net_info)
+int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_info)
 {
 	int json_fd;
 	char puc_ln_buf[100];
@@ -210,7 +210,7 @@ int net_info_report_pathlist(x_net_info_t *net_info)
 	uint8_t *ptr_mac;
 	x_node_list_t *px_node;
 	x_path_info_t *px_path;
-	uint8_t uc_idx;
+	uint8_t uc_node_idx;
 	uint16_t us_path_idx;
 	uint8_t uc_hops;
 	uint8_t puc_ext_addr[24];
@@ -237,17 +237,20 @@ int net_info_report_pathlist(x_net_info_t *net_info)
 
 
 	/* List of Device Nodes */
-	for (uc_idx = 0; uc_idx < net_info->us_num_nodes; uc_idx++) {
+	for (uc_node_idx = 0; uc_node_idx < net_info->us_num_nodes; uc_node_idx++) {
+		/* get node info */
+		px_node = &net_info->x_node_list[uc_node_idx];
 
-		px_node = &net_info->x_node_list[uc_idx];
-		uc_hops = net_info->x_path_info[uc_idx].m_u8ForwardHopsCount;
-//		for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
-//			px_path = (struct TAdpPathDiscoveryConfirm *)&net_info->px_path_nodes[us_path_idx];
-//			if (px_path->m_u16DstAddr == px_node->us_short_address) {
-//				uc_hops = px_path->m_u8ForwardHopsCount;
-//				break;
-//			}
-//		}
+		/* get hops from routes info using extended address */
+		for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
+			uint8_t *puc_ext_addr;
+
+			puc_ext_addr = &routes_info->puc_ext_addr[us_path_idx][0];
+			if (memcmp (puc_ext_addr, px_node->puc_extended_address, EXT_ADDRESS_SIZE) == 0) {
+				uc_hops = routes_info->x_path_info[us_path_idx].m_u8ForwardHopsCount;
+				break;
+			}
+		}
 
 		ptr_mac = &px_node->puc_extended_address;
 		sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *ptr_mac, *(ptr_mac + 1), *(ptr_mac + 2),
@@ -257,7 +260,7 @@ int net_info_report_pathlist(x_net_info_t *net_info)
 				sc_comillas, sc_comillas, sc_comillas, px_node->us_short_address, sc_comillas,
 				sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
 
-		if (uc_idx == (net_info->us_num_nodes - 1)) {
+		if (uc_node_idx == (net_info->us_num_nodes - 1)) {
 			/* Last iteration */
 			i_size_fd += write(json_fd, puc_ln_buf, i_ln_len - 3); /* remove the last semicolon, CR and LF */
 		} else {
@@ -274,7 +277,7 @@ int net_info_report_pathlist(x_net_info_t *net_info)
 		uint16_t us_src, us_dst;
 		uint8_t uc_hope_idx, uc_link_cost;
 
-		px_path = &net_info->x_path_info[us_path_idx];
+		px_path = &routes_info->x_path_info[us_path_idx];
 
 		/* Forward hopes */
 		uc_hope_idx = px_path->m_u8ForwardHopsCount - 1;
