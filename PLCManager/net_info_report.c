@@ -9,7 +9,9 @@
 
 #include "net_info_report.h"
 
-static char spuc_conf_name[20];
+static uint16_t pus_json_refs[NUM_MAX_NODES];
+
+//static char spuc_conf_name[20];
 //static char spuc_tmp_name[50];
 //static char spuc_file_name[50];
 //static char spuc_netroutes_tmp_name[] = "/tmp/netroutes.json";
@@ -130,7 +132,7 @@ static void _mov_file(char *_src_path, char *_dst_path)
 
 void net_info_report_init(void)
 {
-	sprintf(spuc_conf_name, "top_name");
+
 }
 
 //void net_info_report_start_cycle(void)
@@ -224,6 +226,7 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 
 	memset(puc_ext_addr, 0, sizeof(puc_ext_addr));
 	uc_hops = 0;
+	memset(pus_json_refs, INVALID_NODE_ADDRESS, sizeof(pus_json_refs));
 
 	/* First Node is Coordinator */
 	ptr_mac = net_info->puc_extended_addr;
@@ -234,12 +237,16 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 			sc_comillas, sc_comillas, sc_comillas, sc_comillas,
 			sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
 	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+	/* Coordinator json ref -> Use index 0 */
+	pus_json_refs[0] = 0;
 
 
 	/* List of Device Nodes */
 	for (uc_node_idx = 0; uc_node_idx < net_info->us_num_nodes; uc_node_idx++) {
 		/* get node info */
 		px_node = &net_info->x_node_list[uc_node_idx];
+		/* Node json ref */
+		pus_json_refs[px_node->us_short_address] = uc_node_idx + 1;
 
 		/* get hops from routes info using extended address */
 		for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
@@ -272,7 +279,7 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 	i_ln_len = sprintf(puc_ln_buf, "\r\n\t],\r\n\t%clinks%c:[\r\n", sc_comillas, sc_comillas);
 	write(json_fd, puc_ln_buf, i_ln_len);
 
-	/* List Links */
+	/* List Links -> Use JSON refs instead of short address */
 	for (us_path_idx = 0; us_path_idx < net_info->us_num_path_nodes; us_path_idx++) {
 		uint16_t us_src, us_dst;
 		uint8_t uc_hope_idx, uc_link_cost;
@@ -291,8 +298,8 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 		us_dst = px_path->m_aForwardPath[uc_hope_idx].m_u16HopAddress;
 		uc_link_cost = px_path->m_aForwardPath[uc_hope_idx].m_u8LinkCost;
 		i_ln_len = sprintf(puc_ln_buf, "\t\t{%csource%c:%d,%ctarget%c:%d,%cvalue%c:%d},\r\n",
-							sc_comillas, sc_comillas, us_src,
-							sc_comillas, sc_comillas, us_dst,
+							sc_comillas, sc_comillas, pus_json_refs[us_src],
+							sc_comillas, sc_comillas, pus_json_refs[us_dst],
 							sc_comillas, sc_comillas, uc_link_cost);
 
 		if (us_path_idx == (net_info->us_num_path_nodes - 1)) {
