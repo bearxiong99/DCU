@@ -11,6 +11,8 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
+//#define SOCKET_DEBUG_CONSOLE
+
 #define SOCKET_MAX_NUM           16
 #define SOCKET_MAX_CONN          5
 

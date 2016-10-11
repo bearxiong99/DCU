@@ -8,15 +8,15 @@
 #include <fcntl.h>
 
 #include "socket_handler.h"
-#include "app_debug.h"
 #include "ifaceNet_api.h"
 #include "net_info_mng.h"
 #include "net_info_report.h"
+#include "http_mng.h"
 
-#ifdef APP_DEBUG_CONSOLE
-#	define LOG_APP_DEBUG(a)   printf a
+#ifdef NET_INFO_DEBUG_CONSOLE
+#	define LOG_NET_INFO_DEBUG(a)   printf a
 #else
-#	define LOG_APP_DEBUG(a)   (void)0
+#	define LOG_NET_INFO_DEBUG(a)   (void)0
 #endif
 
 static int si_net_info_id;
@@ -26,6 +26,7 @@ static unsigned char suc_net_info_buf[MAX_NET_INFO_SOCKET_SIZE];
 
 static net_info_cdata_cfm_t sx_coord_data;
 static x_net_info_t sx_net_info;
+static x_net_statistics_t sx_net_statistics;
 static x_routes_info_t sx_routes_info;
 
 static uint16_t sus_node_addr_path_req;
@@ -48,14 +49,14 @@ static void _start_preq_next_request(void)
 {
 	sb_pending_preq_cfm = true;
 	sul_waiting_preq_timer = TIMER_TO_REQ_PATH_INFO;
-	printf("_start_preq_next_request (node 0x%04x)\r\n", sus_node_addr_path_req);
+	LOG_NET_INFO_DEBUG(("_start_preq_next_request (node 0x%04x)\r\n", sus_node_addr_path_req));
 }
 
 static void _cancel_preq_next_request(void)
 {
 	sb_pending_preq_cfm = false;
 	sul_waiting_preq_timer = 0;
-	printf("_cancel_preq_next_request\r\n");
+	LOG_NET_INFO_DEBUG(("_cancel_preq_next_request\r\n"));
 }
 
 static uint16_t _extract_u16(void *vptr_value) {
@@ -161,37 +162,6 @@ static void _clear_path_info(uint16_t us_node_addr)
 	}
 }
 
-/**
- * \brief Process messages received from External Interface.
- * Unpack External Interface protocol command
- */
-static void _net_info_server_rcv_cmd(uint8_t* buf, uint16_t buflen)
-{
-    uint8_t *puc_buf;
-
-    puc_buf = buf;
-
-    switch (*puc_buf++) {
-    case NET_INFO_WCMD_START_CYCLES:
-		{
-			PRINTF("Net Info manager: start cycles\n");
-		}
-    	break;
-
-    case NET_INFO_WCMD_STOP_CYCLES:
-		{
-			PRINTF("Net Info manager: stop cycles\n");
-		}
-    	break;
-
-    case NET_INFO_WCMD_GET_ID:
-		{
-			PRINTF("Net Info manager: get info id\n");
-		}
-    	break;
-    }
-}
-
 static void NetInfoGetConfirm(net_info_get_cfm_t *px_cfm_info)
 {
 
@@ -216,6 +186,8 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 	case NET_INFO_UPDATE_NODE_LIST:
 	{
 		uint16_t us_node_addr;
+		char puc_http_cmd[10];
+		uint16_t us_data_size;
 
 		/* Update net info */
 		sx_net_info.us_num_nodes = _extract_u16(puc_ev_info);
@@ -247,6 +219,13 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 			sus_node_addr_path_req = us_node_addr;
 			_start_preq_next_request();
 		}
+
+		us_data_size = sprintf(puc_http_cmd, "%u", sx_net_info.us_num_nodes);
+
+		/* Update Web server */
+		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+		http_mng_send_cmd(LNXCMS_UPDATE_NUM_DEV, &sx_net_info.us_num_nodes);
+
 
 	}
 		break;
@@ -280,6 +259,9 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 		/* Set path info validation */
 		if ((us_node_idx < NUM_MAX_NODES) && (px_path_info->m_u8Status == 0)) {
+			/* Update statistics */
+			sx_net_statistics.us_num_path_succ++;
+
 			/* Cancel next programmed request */
 			_cancel_preq_next_request();
 
@@ -292,12 +274,12 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 			/* reset node to request */
 			sus_node_addr_path_req = INVALID_NODE_ADDRESS;
 
-			/* Check JSON update */
-			if (sx_net_info.us_num_nodes == sx_net_info.us_num_path_nodes) {
-				/* Report Pathlist */
-				net_info_report_pathlist(&sx_net_info, &sx_routes_info);
-			}
+			/* Report Pathlist */
+			net_info_report_pathlist(&sx_net_info, &sx_routes_info);
 
+			/* Update Web server */
+			net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+			http_mng_send_cmd(LNXCMS_UPDATE_NUM_DEV, &sx_net_info.us_num_nodes);
 		}
 	}
 		break;
@@ -338,9 +320,47 @@ void net_info_mng_process(void)
 	}
 
 	if (sb_pending_preq_cfm) {
-		sul_preq_requests++;
+		/* Update statistics */
+		sx_net_statistics.us_num_path_req++;
 		NetInfoGetPathRequest(sus_node_addr_path_req);
 		_start_preq_next_request();
+	} else {
+		// Check nodes and paths integrity
+		if (sx_net_info.us_num_path_nodes < sx_net_info.us_num_nodes) {
+			uint16_t us_node_idx, us_path_idx;
+			x_node_list_t *px_node;
+			bool b_check_next_node;
+
+			b_check_next_node = true;
+
+			for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
+				px_node = &sx_net_info.x_node_list[us_node_idx];
+				for (us_path_idx = 0; us_path_idx < NUM_MAX_NODES; us_path_idx++) {
+					if (memcmp(px_node->puc_extended_address,
+							sx_routes_info.puc_ext_addr[us_path_idx], EXT_ADDRESS_SIZE) == 0) {
+						if (sx_routes_info.b_path_is_valid[us_path_idx]) {
+							/* Find valid route for this node -> check next node */
+						} else {
+							/* Find INVALID route for this node -> request */
+							sx_net_statistics.us_num_path_req++;
+							NetInfoGetPathRequest(px_node->us_short_address);
+							_start_preq_next_request();
+							b_check_next_node = false;
+						}
+						break;
+					}
+
+					if (us_path_idx == sx_net_info.us_num_path_nodes) {
+						/* no more path to check for this node */
+						break;
+					}
+				}
+
+				if (!b_check_next_node) {
+					break;
+				}
+			}
+		}
 	}
 
 }
@@ -373,32 +393,53 @@ void net_info_mng_init(int _app_id)
 	sul_waiting_preq_timer = 0;
 
 	/* Init statistics */
-	sul_preq_requests = 0;
+	memset(&sx_net_statistics, 0, sizeof(sx_net_statistics));
 
 	/* reset reports */
 	net_info_report_pathlist(&sx_net_info, &sx_routes_info);
 
 }
 
+//
+//void net_info_mng_callback(socket_ev_info_t *_ev_info)
+//{
+//	if (_ev_info->i_socket_fd >= 0) {
+//		if (_ev_info->i_event_type == SOCKET_EV_LINK_TYPE) {
+//			/* Manage LINK */
+//			si_net_info_link_fd = _ev_info->i_socket_fd;
+//			socket_accept_conn(_ev_info);
+//		} else if (_ev_info->i_event_type == SOCKET_EV_DATA_TYPE) {
+//			/* Receive DATA */
+//			ssize_t i_bytes;
+//			si_net_info_data_fd = _ev_info->i_socket_fd;
+//			/* Read data from Socket */
+//			i_bytes = read(_ev_info->i_socket_fd, suc_net_info_buf, MAX_NET_INFO_SOCKET_SIZE);
+//			if (i_bytes > 0) {
+//				_net_info_server_rcv_cmd(suc_net_info_buf, i_bytes);
+//			} else {
+//				socket_check_connection(_ev_info->i_app_id, _ev_info->i_socket_fd);
+//			}
+//		}
+//	}
+//}
+//
 
-void net_info_mng_callback(socket_ev_info_t *_ev_info)
+
+/**
+ */
+void net_info_webcmd_process(uint8_t* buf)
 {
-	if (_ev_info->i_socket_fd >= 0) {
-		if (_ev_info->i_event_type == SOCKET_EV_LINK_TYPE) {
-			/* Manage LINK */
-			si_net_info_link_fd = _ev_info->i_socket_fd;
-			socket_accept_conn(_ev_info);
-		} else if (_ev_info->i_event_type == SOCKET_EV_DATA_TYPE) {
-			/* Receive DATA */
-			ssize_t i_bytes;
-			si_net_info_data_fd = _ev_info->i_socket_fd;
-			/* Read data from Socket */
-			i_bytes = read(_ev_info->i_socket_fd, suc_net_info_buf, MAX_NET_INFO_SOCKET_SIZE);
-			if (i_bytes > 0) {
-				_net_info_server_rcv_cmd(suc_net_info_buf, i_bytes);
-			} else {
-				socket_check_connection(_ev_info->i_app_id, _ev_info->i_socket_fd);
-			}
+    uint8_t *puc_buf;
+
+    puc_buf = buf;
+
+    switch (*puc_buf) {
+    case WEBCMD_UPDATE_DASHBOARD:
+		{
+			LOG_NET_INFO_DEBUG(("Net Info manager: update dash board info\n"));
+			net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+			http_mng_send_cmd(LNXCMS_UPDATE_NUM_DEV, 0);
 		}
-	}
+    	break;
+    }
 }

@@ -9,6 +9,12 @@
 
 #include "net_info_report.h"
 
+#ifdef NET_REPORT_DEBUG_CONSOLE
+#	define LOG_REPORT_DEBUG(a)   printf a
+#else
+#	define LOG_REPORT_DEBUG(a)   (void)0
+#endif
+
 static uint16_t pus_json_refs[NUM_MAX_NODES];
 
 //static char spuc_conf_name[20];
@@ -25,6 +31,12 @@ static char spuc_blacklist_name[] = "/home/DCWeb/public/tables/blacklist.json";
 
 static char spuc_pathlist_tmp_name[] = "/tmp/pathlist.json";
 static char spuc_pathlist_name[] = "/home/DCWeb/public/tables/pathlist.json";
+
+static char spuc_numdev_tmp_name[] = "/tmp/numdev.json";
+static char spuc_numdev_name[] = "/home/DCWeb/public/tables/numdev.json";
+
+static char spuc_dashboard_tmp_name[] = "/tmp/dashboard.json";
+static char spuc_dashboard_name[] = "/home/DCWeb/public/tables/dashboard.json";
 
 //static char spuc_nodesinfo_path[] = "/home/DCWeb/public/tables/nodes/";
 
@@ -89,7 +101,7 @@ static void _mov_file(char *_src_path, char *_dst_path)
 //	dst_fd = creat(spuc_pathlist_tmp_name, O_RDWR);
 //
 //	if (dir == NULL) {
-//		printf("No puedo abrir el directorio");
+//		LOG_REPORT_DEBUG(("No puedo abrir el directorio"));
 //		return;
 //	}
 //
@@ -217,7 +229,7 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 	uint8_t uc_hops;
 	uint8_t puc_ext_addr[24];
 
-	printf ("PATHLIST creating...\r\n");
+	LOG_REPORT_DEBUG(("PATHLIST creating...\r\n"));
 
 	json_fd = open(spuc_pathlist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);;
 
@@ -233,9 +245,15 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 	sprintf(puc_ext_addr, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *(ptr_mac + 7), *(ptr_mac + 6), *(ptr_mac + 5),
 					*(ptr_mac + 4), *(ptr_mac + 3), *(ptr_mac + 2), *(ptr_mac + 1), *ptr_mac);
 
-	i_ln_len = sprintf(puc_ln_buf, "\t\t{%cu16Addr%c:%c0%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
-			sc_comillas, sc_comillas, sc_comillas, sc_comillas,
-			sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
+	if (net_info->us_num_nodes) {
+		i_ln_len = sprintf(puc_ln_buf, "\t\t{%cu16Addr%c:%c0%c,%cu64Addr%c:%c%s%c,%chops%c:%d},\r\n",
+				sc_comillas, sc_comillas, sc_comillas, sc_comillas,
+				sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
+	} else {
+		i_ln_len = sprintf(puc_ln_buf, "\t\t{%cu16Addr%c:%c0%c,%cu64Addr%c:%c%s%c,%chops%c:%d}\r\n",
+						sc_comillas, sc_comillas, sc_comillas, sc_comillas,
+						sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas, sc_comillas, sc_comillas, uc_hops);
+	}
 	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
 	/* Coordinator json ref -> Use index 0 */
 	pus_json_refs[0] = 0;
@@ -354,7 +372,7 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 	/* Move temporal file to WebServer folder */
 	_mov_file(spuc_pathlist_tmp_name, spuc_pathlist_name);
 
-	printf ("PATHLIST created\r\n");
+	LOG_REPORT_DEBUG(("PATHLIST created\r\n"));
 
 	return (i_size_fd);
 }
@@ -369,13 +387,17 @@ int net_info_report_netlist(x_net_info_t *net_info)
 	int i_ln_len, i_size_fd;
 	int json_fd;
 
-	printf ("NETLIST creating...\r\n");
+	LOG_REPORT_DEBUG(("NETLIST creating...\r\n"));
 
 	json_fd = open(spuc_netlist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 
 	us_node_idx = 0;
 
-	i_ln_len = sprintf(puc_ln_buf, "[\r\n");
+	if (net_info->us_num_nodes) {
+		i_ln_len = sprintf(puc_ln_buf, "[\r\n");
+	} else {
+		i_ln_len = sprintf(puc_ln_buf, "[\r\n]");
+	}
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 
 	for (us_node_idx = 0; us_node_idx < net_info->us_num_nodes; us_node_idx++) {
@@ -412,7 +434,7 @@ int net_info_report_netlist(x_net_info_t *net_info)
 	/* Move temporal file to WebServer folder */
 	_mov_file(spuc_netlist_tmp_name, spuc_netlist_name);
 
-	printf ("NETLIST created\r\n");
+	LOG_REPORT_DEBUG(("NETLIST created\r\n"));
 
 	return (i_size_fd);
 }
@@ -426,7 +448,7 @@ int net_info_report_blacklist(x_net_info_t *net_info)
 	int i_ln_len, i_size_fd;
 	int json_fd;
 
-	printf ("BLACKLIST creating...\r\n");
+	LOG_REPORT_DEBUG(("BLACKLIST creating...\r\n"));
 
 	json_fd = open(spuc_blacklist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 
@@ -465,79 +487,113 @@ int net_info_report_blacklist(x_net_info_t *net_info)
 	/* Move temporal file to WebServer folder */
 	_mov_file(spuc_blacklist_tmp_name, spuc_blacklist_name);
 
-	printf ("BLACKLIST created\r\n");
+	LOG_REPORT_DEBUG(("BLACKLIST created\r\n"));
 
 	return (i_size_fd);
 }
 
+int net_info_report_dev_num(x_net_info_t *net_info)
+{
+	uint8_t *ptr_mac;
+	uint16_t us_node_idx;
+	uint8_t puc_ext_addr[24];
+	char puc_ln_buf[96];
+	int i_ln_len, i_size_fd;
+	int json_fd;
 
-//int net_info_report_path_info(uint16_t us_node_addr, uint8_t *ptr_ext, x_path_info_t *path_info)
-//{
-//	uint8_t puc_ext_addr[24];
-//	char puc_ln_buf[96];
-//	int i_ln_len, i_size_fd;
-//	int json_fd;
-//	char spuc_nodeinfo_name[50];
-//	uint16_t us_src, us_dst;
-//	uint8_t uc_hope_idx;
-//
-//	printf ("NODE INFO updating...\r\n");
-//
-//	/* Write Node Info file */
-//	i_ln_len = sprintf(spuc_nodeinfo_name, "%snode_%u.json", spuc_nodesinfo_path, us_node_addr);
-//
-//	json_fd = open(spuc_nodeinfo_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
-//
-//	sprintf(puc_ext_addr, "0x%02X%02X%02X%02X%02X%02X%02X%02X", *ptr_ext, *(ptr_ext + 1), *(ptr_ext + 2),
-//			*(ptr_ext + 3), *(ptr_ext + 4), *(ptr_ext + 5), *(ptr_ext + 6), *(ptr_ext + 7));
-//
-//	i_ln_len = sprintf(puc_ln_buf, "{%cu16Addr%c:%c%u%c,%cu64Addr%c:%c%s%c,%chops%c:%u},\r\n",
-//			sc_comillas, sc_comillas, sc_comillas, us_node_addr, sc_comillas,
-//			sc_comillas, sc_comillas, sc_comillas, puc_ext_addr, sc_comillas,
-//			sc_comillas, sc_comillas, path_info->m_u8ForwardHopsCount);
-//
-//	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
-//	close(json_fd);
-//
-//	/* Write Node Routes Info file */
-//	i_ln_len = sprintf(spuc_nodeinfo_name, "%snodelink_%u.json", spuc_nodesinfo_path, us_node_addr);
-//
-//	json_fd = open(spuc_nodeinfo_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
-//
-//	/* List Links */
-//	/* Forward hopes */
-//	us_src = 0;
-//	for (uc_hope_idx = 0; uc_hope_idx < path_info->m_u8ForwardHopsCount; uc_hope_idx++) {
-//		us_dst = _extract_u16(&path_info->m_aForwardPath[uc_hope_idx].m_u16HopAddress);
-//		i_ln_len = sprintf(puc_ln_buf, "{%csource%c:%d,%ctarget%c:%d,%cvalue%c:%d},\r\n",
-//				sc_comillas, sc_comillas, us_src,
-//				sc_comillas, sc_comillas, us_dst,
-//				sc_comillas, sc_comillas, path_info->m_aForwardPath[uc_hope_idx].m_u8LinkCost);
-//		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-//
-//		us_src = us_dst;
-//	}
-//
-//	/* Reverse hopes */
-//	us_src = _extract_u16(&path_info->m_u16OrigAddr);
-//	for (uc_hope_idx = 0; uc_hope_idx < path_info->m_u8ReverseHopsCount; uc_hope_idx++) {
-//		us_dst = _extract_u16(&path_info->m_aReversePath[uc_hope_idx].m_u16HopAddress);
-//		i_ln_len = sprintf(puc_ln_buf, "{%csource%c:%d,%ctarget%c:%d,%cvalue%c:%d},\r\n",
-//				sc_comillas, sc_comillas, us_src,
-//				sc_comillas, sc_comillas, us_dst,
-//				sc_comillas, sc_comillas, path_info->m_aForwardPath[uc_hope_idx].m_u8LinkCost);
-//		i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
-//
-//		us_src = us_dst;
-//	}
-//
-//	close(json_fd);
-//
-//	printf ("NODE INFO updated\r\n");
-//
-//	_build_pathinfo();
-//
-//	return (i_size_fd);
-//}
+	LOG_REPORT_DEBUG(("DEV NUM creating...\r\n"));
+
+	json_fd = open(spuc_numdev_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+
+	i_ln_len = sprintf(puc_ln_buf, "%u", net_info->us_num_nodes);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	close(json_fd);
+
+	/* Move temporal file to WebServer folder */
+	_mov_file(spuc_numdev_tmp_name, spuc_numdev_name);
+
+	LOG_REPORT_DEBUG(("DEV NUM created\r\n"));
+
+	return (i_size_fd);
+}
+
+int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_stats)
+{
+	char puc_ln_buf[96];
+	int i_ln_len, i_size_fd;
+	int json_fd;
+	uint32_t ul_tmp;
+
+	LOG_REPORT_DEBUG(("DASHBOARD creating...\r\n"));
+
+	json_fd = open(spuc_dashboard_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+
+	i_ln_len = sprintf(puc_ln_buf, "[{");
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	/* Number of devices */
+	i_ln_len = sprintf(puc_ln_buf, "%cnumdevs%c:%u,", sc_comillas, sc_comillas, net_info->us_num_nodes);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+	/* Number of data request */
+	i_ln_len = sprintf(puc_ln_buf, "%cnummsgs%c:%u,", sc_comillas, sc_comillas, net_stats->us_num_data_req);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+	/* Number of ping request */
+	i_ln_len = sprintf(puc_ln_buf, "%cnumpings%c:%u,", sc_comillas, sc_comillas, net_stats->us_num_ping_req);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+	/* Number of path request */
+	i_ln_len = sprintf(puc_ln_buf, "%cnumpaths%c:%u,", sc_comillas, sc_comillas, net_info->us_num_path_nodes);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	/* Network coverage ?????? */
+	if (net_info->us_num_nodes) {
+		ul_tmp = net_info->us_num_path_nodes * 100 / net_info->us_num_nodes;
+	} else {
+		ul_tmp = 0;
+	}
+	i_ln_len = sprintf(puc_ln_buf, "%cnet_cov%c:%u,", sc_comillas, sc_comillas, ul_tmp);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	/* Data coverage */
+	if (net_stats->us_num_data_req) {
+		ul_tmp = (net_stats->us_num_data_succ * 100) / net_stats->us_num_data_req;
+	} else {
+		ul_tmp = 0;
+	}
+	i_ln_len = sprintf(puc_ln_buf, "%cdata_cov%c:%u,", sc_comillas, sc_comillas, ul_tmp);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	/* Ping success */
+	if (net_stats->us_num_ping_req) {
+		ul_tmp = (net_stats->us_num_ping_succ * 100) / net_stats->us_num_ping_req;
+	} else {
+		ul_tmp = 0;
+	}
+	i_ln_len = sprintf(puc_ln_buf, "%cping_cov%c:%u,", sc_comillas, sc_comillas, ul_tmp);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	/* Routing errors */
+	if (net_stats->us_num_path_req) {
+		ul_tmp = (net_stats->us_num_path_succ * 100) / net_stats->us_num_path_req;
+		i_ln_len = sprintf(puc_ln_buf, "%croute_errors%c:%u", sc_comillas, sc_comillas, 100 - ul_tmp);
+	} else {
+		ul_tmp = 0;
+		i_ln_len = sprintf(puc_ln_buf, "%croute_errors%c:%u", sc_comillas, sc_comillas, ul_tmp);
+	}
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+
+	i_ln_len = sprintf(puc_ln_buf, "}]");
+	i_size_fd += write(json_fd, puc_ln_buf, i_ln_len);
+
+	close(json_fd);
+
+	/* Move temporal file to WebServer folder */
+	_mov_file(spuc_dashboard_tmp_name, spuc_dashboard_name);
+
+	LOG_REPORT_DEBUG(("DASHBOARD created\r\n"));
+
+	return (i_size_fd);
+}
 
 

@@ -14,8 +14,14 @@
 #include <arpa/inet.h>
 #include "socket_handler.h"
 #include "http_mng.h"
-#include "app_debug.h"
+#include "net_info_mng.h"
 #include "plcmanager.h"
+
+#ifdef HTTP_DEBUG_CONSOLE
+#	define LOG_HTTP_DEBUG(a)   printf a
+#else
+#	define LOG_HTTP_DEBUG(a)   (void)0
+#endif
 
 /* http client socket descriptors */
 static bool sb_http_connect;
@@ -26,81 +32,59 @@ static struct sockaddr_in serverAddress;
 static int si_http_link_fd;
 static int si_http_data_fd;
 
-#define MAX_HTTP_BUFFER_SIZE             1000
+#define MAX_HTTP_BUFFER_SIZE     1000
 
 static unsigned char suc_http_rx_buf[MAX_HTTP_BUFFER_SIZE];
 static unsigned char suc_http_tx_buf[MAX_HTTP_BUFFER_SIZE];
 
-#define HOST       "127.0.0.1"
-#define CMD0       "/pibrsp"
-#define PORT       3000
-#define USERAGENT  "HTMLGET 1.0"
+#define HOST                     "127.0.0.1"
+#define PORT                     3000
+#define MAX_BUFF_HTTP_CMD        50
 
-static void _build_get_query(char *page)
+static const char sc_com = '"';
+
+static uint16_t _build_post_query(uint8_t uc_cmd, void *pv_data)
 {
-	//char *query;
-	char *getpage = page;
-	char *tpl = "GET /%s HTTP/1.0\r\nHost: %s\r\nUser-Agent: %s\r\n\r\n";
-	if(getpage[0] == '/'){
-		getpage = getpage + 1;
-		PRINTF("Removing leading \"/\", converting %s to %s\n", page, getpage);
+	uint16_t us_len;
+
+	char *tpl = "POST / HTTP/1.1\r\nAccept: application/json\r\nContent-Type: application/json\r\nHost: %s:%u\r\ncontent-length: %u\r\n\r\n%s";
+	char page[20];
+
+	(void)pv_data;
+
+	switch(uc_cmd) {
+	case LNXCMS_UPDATE_NUM_DEV:
+		sprintf(page, "[{%clnxcmd%c:%u}]", sc_com, sc_com, uc_cmd);
+		us_len = sprintf((char *)suc_http_tx_buf, tpl, HOST, PORT, strlen(page), page);
+		break;
+
+	default:
+		us_len = 0;
 	}
-	// -5 is to consider the %s %s %s in tpl and the ending \0
-	//query = (char *)malloc(strlen(host)+strlen(getpage)+strlen(USERAGENT)+strlen(tpl)-5);
-	sprintf((char *)suc_http_tx_buf, tpl, getpage, HOST, USERAGENT);
-	//return query;
+
+	return us_len;
 }
-/*
-static void _build_post_query(char *page)
-{
-	//char *query;
-	char *getpage = page;
-	char *tpl = "GET /%s HTTP/1.0\r\nHost: %s\r\nUser-Agent: %s\r\n\r\n";
-	if(getpage[0] == '/'){
-		getpage = getpage + 1;
-		PRINTF("Removing leading \"/\", converting %s to %s\n", page, getpage);
-	}
-	// -5 is to consider the %s %s %s in tpl and the ending \0
-	//query = (char *)malloc(strlen(host)+strlen(getpage)+strlen(USERAGENT)+strlen(tpl)-5);
-	sprintf((char *)suc_http_tx_buf, tpl, getpage, HOST, USERAGENT);
-	//return query;
-}
-*/
+
 /**
  * \brief Process command/response received from NODE JS.
  */
 static void _http_rcv_cmd(uint8_t* buf, uint16_t buflen)
 {
     uint8_t *puc_buf;
-    uint8_t *puc_getpib;
+    uint8_t *puc_cmd;
     uint16_t us_pib_id;
 
     puc_buf = buf;
 
-    printf("%s\r\n\r\n", puc_buf);
+    LOG_HTTP_DEBUG(("%s\r\n\r\n", puc_buf));
 
-    puc_getpib = (uint8_t *)strstr(puc_buf, "getpib");
+    puc_cmd = (uint8_t *)strstr(puc_buf, "webcmd");
+    if (puc_cmd) {
+    	/* Filter only web commands */
+    	puc_cmd += 8;
 
-    // Analizar el contenido del mensaje para saber si es respuesta o comando
-    if (puc_getpib) {
-    	// Extract command
-    	puc_getpib += 9;
-    	us_pib_id = (*puc_getpib++ - 0x30) * 10;
-    	us_pib_id += (*puc_getpib - 0x30);
-
-    	switch(us_pib_id) {
-    	case 12:
-    		printf("PIB Route Table Request\r\n");
-    		http_mng_send_cmd();
-    		break;
-    	default:
-    		printf("PIB not defined\r\n");
-    	}
-
-
-    } else {
-    	// ERROR
-
+    	/* Pass web cmd to net info */
+    	net_info_webcmd_process(puc_cmd);
     }
 
     memset(suc_http_rx_buf, 0x00, MAX_HTTP_BUFFER_SIZE);
@@ -117,13 +101,15 @@ void http_mng_init(void)
 
 }
 
-void http_mng_send_cmd(void)
+void http_mng_send_cmd(uint8_t uc_cmd, void *pv_data)
 {
-	bool b_send_cmd = false;
+	uint16_t us_size_qry;
 
-	// Build HTTP sentence
-	_build_get_query(CMD0);
-	//_build_post_query(CMD0);
+	// Build HTTP linux command
+	us_size_qry = _build_post_query(uc_cmd, pv_data);
+	if (us_size_qry == 0) {
+		return;
+	}
 
 	/* Send HTTP REST API to the server */
 	/* Check internal http connection */
@@ -131,16 +117,16 @@ void http_mng_send_cmd(void)
 		/* Create Client socket to connect NODE JS server */
 		si_http_socket_fd = socket(AF_INET , SOCK_STREAM , IPPROTO_TCP);
 		if (si_http_socket_fd == -1)	{
-			PRINTF("Could not create socket\n");
+			LOG_HTTP_DEBUG(("Could not create socket\n"));
 			return;
 		}
 
 		//Connect to remote server
 		if (connect(si_http_socket_fd , (struct sockaddr *)&serverAddress , sizeof(serverAddress)) == SOCKET_ERROR) {
-			PRINTF("connect failed. Error\n");
+			LOG_HTTP_DEBUG(("connect failed. Error\n"));
 			sb_http_connect = false;
 		} else {
-			PRINTF("Connected\n");
+			LOG_HTTP_DEBUG(("Connected\n"));
 			sb_http_connect = true;
 
 			/* Add listener to USI port */
@@ -149,10 +135,15 @@ void http_mng_send_cmd(void)
 	}
 
 	if (sb_http_connect) {
-		if (write(si_http_socket_fd, (char *)suc_http_tx_buf, strlen((char *)suc_http_tx_buf)) == SOCKET_ERROR) {
-			PRINTF ("Cannot sent message");
+		if (write(si_http_socket_fd, (char *)suc_http_tx_buf, us_size_qry) == SOCKET_ERROR) {
+			LOG_HTTP_DEBUG(("Cannot sent message\n"));
+			socket_dettach_connection(PLC_MNG_HTTP_MNG_APP_ID, si_http_socket_fd);
+			sb_http_connect = false;
+		} else {
+			LOG_HTTP_DEBUG(("PLC message sended:\r\n%s\r\n", suc_http_tx_buf));
 		}
 	}
+
 }
 
 void http_mng_callback(socket_ev_info_t *_ev_info)

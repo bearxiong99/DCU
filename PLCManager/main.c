@@ -30,11 +30,18 @@
 #include "socket_handler.h"
 #include "plcmanager.h"
 #include "net_info_mng.h"
-#include "app_debug.h"
 #include "http_mng.h"
 #include "sniffer.h"
 #include "usi_host.h"
 #include "hal_utils.h"
+
+#define MAIN_DEBUG_CONSOLE
+
+#ifdef MAIN_DEBUG_CONSOLE
+#	define LOG_MAIN_DEBUG(a)   printf a
+#else
+#	define LOG_MAIN_DEBUG(a)   (void)0
+#endif
 
 
 typedef struct {
@@ -51,8 +58,6 @@ int main(int argc, char** argv)
 	int pi_usi_fds;
 	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200}; //{"/dev/ttyS0", 115200};
 
-	PRINTF_INIT();
-
 	/* Init callbacks for applications */
 	memset(&app_cbs, 0, sizeof(app_cbs));
 
@@ -62,21 +67,21 @@ int main(int argc, char** argv)
 	/* Open SNIFFER server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_SNIFFER_APP_ID, INADDR_ANY, PLC_MNG_SNIFFER_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF("Cannot open Sniffer Server socket.");
+		LOG_MAIN_DEBUG(("Cannot open Sniffer Server socket."));
 		exit(-1);
 	}
 
-	/* Open ADP internal server socket */
-	i_socket_res =  socket_create_server(PLC_MNG_NET_INFO_APP_ID, INADDR_ANY, PLC_MNG_NET_INFO_APP_PORT);
-	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF("Cannot open Net Info Manager internal Server socket.");
-		exit(-1);
-	}
+//	/* Open ADP internal server socket */
+//	i_socket_res =  socket_create_server(PLC_MNG_NET_INFO_APP_ID, INADDR_ANY, PLC_MNG_NET_INFO_APP_PORT);
+//	if (i_socket_res == SOCKET_ERROR) {
+//		LOG_MAIN_DEBUG(("Cannot open Net Info Manager internal Server socket."));
+//		exit(-1);
+//	}
 
 	/* Open HTTP internal NODE server socket */
-	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_ANY, PLC_MNG_HTTP_MNG_APP_PORT);
+	i_socket_res =  socket_create_server(PLC_MNG_HTTP_MNG_APP_ID, INADDR_LOOPBACK, PLC_MNG_HTTP_MNG_APP_PORT);
 	if (i_socket_res == SOCKET_ERROR) {
-		PRINTF("Cannot open HTTP internal NODE Server socket.");
+		LOG_MAIN_DEBUG(("Cannot open HTTP internal NODE Server socket."));
 		exit(-1);
 	}
 
@@ -84,7 +89,7 @@ int main(int argc, char** argv)
 	usi_host_init();
 	pi_usi_fds = usi_host_open(serial_args.sz_tty_name, serial_args.ui_baudrate);
 	if (pi_usi_fds == SOCKET_ERROR) {
-		PRINTF("Cannot open Serial Port socket\n");
+		LOG_MAIN_DEBUG(("Cannot open Serial Port socket\n"));
 		exit(-1);
 	} else {
 		/* Add listener to USI port */
@@ -96,14 +101,14 @@ int main(int argc, char** argv)
 	/* Init Sniffer APP : Serve to SNIFFER tool. */
 	sniffer_init(PLC_MNG_SNIFFER_APP_ID, pi_usi_fds);
 
-	/* Register Net Info Manager APP callback */
-	app_cbs[PLC_MNG_NET_INFO_APP_ID] = net_info_mng_callback;
-	/* Init CLI app */
+//	/* Register Net Info Manager APP callback */
+//	app_cbs[PLC_MNG_NET_INFO_APP_ID] = net_info_mng_callback;
+	/* Init NET INFO app through USI interface */
 	net_info_mng_init(PLC_MNG_NET_INFO_APP_ID);
 
 	/* Register HTTP internal NODE APP callback */
 	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
-	/* Init HTTP client manager to connect with NODE server */
+	/* Init HTTP client manager to connect with NODE server -> Send data to NetInfo */
 	http_mng_init();
 
 	while(1) {

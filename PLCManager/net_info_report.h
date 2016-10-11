@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#define NET_REPORT_DEBUG_CONSOLE
+
 #define NUM_MAX_NODES            10
 #define NUM_MAX_BLACK_NODES      10
 #define EXT_ADDRESS_SIZE         8
@@ -58,7 +60,14 @@ typedef struct x_net_info {
 	x_node_list_t x_node_list[NUM_MAX_NODES];
 } x_net_info_t;
 
-
+typedef struct x_net_stats {
+	uint32_t us_num_data_req;
+	uint32_t us_num_ping_req;
+	uint32_t us_num_path_req;
+	uint32_t us_num_data_succ;
+	uint32_t us_num_ping_succ;
+	uint32_t us_num_path_succ;
+} x_net_statistics_t;
 
 void net_info_report_init(void);
 void net_info_report_start_cycle(void);
@@ -73,5 +82,8 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 int net_info_report_netlist(x_net_info_t *net_info);
 int net_info_report_blacklist(x_net_info_t *net_info);
 int net_info_report_path_info(uint16_t us_node_addr, uint8_t *puc_ext_addr, x_path_info_t *path_info);
+
+int net_info_report_dev_num(x_net_info_t *net_info);
+int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_stats);
 
 #endif /* NET_INFO_REPORT_H_INCLUDED */
