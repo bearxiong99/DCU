@@ -205,14 +205,7 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 		net_info_report_netlist(&sx_net_info);
 
-		/* Check Validity of Coordinator Data */
-		if (sx_coord_data.b_is_valid == false) {
-			/* get coordinator data */
-			NetInfoCoordinatorData();
-			/* Blocking process to wait Coord Data Msg */
-			sul_waiting_cdata_timer = TIMER_TO_CDATA_INFO;
-			sb_pending_cdata_cfm = true;
-		}
+
 
 		/* In case of path needed -> wait time */
 		if (sx_net_info.us_num_nodes > sx_net_info.us_num_path_nodes) {
@@ -224,7 +217,7 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 		/* Update Web server */
 		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
-		http_mng_send_cmd(LNXCMS_UPDATE_NUM_DEV, &sx_net_info.us_num_nodes);
+		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
 
 
 	}
@@ -276,10 +269,11 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 			/* Report Pathlist */
 			net_info_report_pathlist(&sx_net_info, &sx_routes_info);
+			http_mng_send_cmd(LNXCMS_UPDATE_PATHLIST, 0);
 
 			/* Update Web server */
 			net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
-			http_mng_send_cmd(LNXCMS_UPDATE_NUM_DEV, &sx_net_info.us_num_nodes);
+			http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
 		}
 	}
 		break;
@@ -311,11 +305,22 @@ void net_info_mng_process(void)
 
 	if (sul_waiting_cdata_timer) {
 		sul_waiting_cdata_timer--;
+		return;
 	}
 
 	if (sul_waiting_preq_timer) {
 		/* Blocking timer */
 		sul_waiting_preq_timer--;
+		return;
+	}
+
+	/* Check Validity of Coordinator Data */
+	if (sx_coord_data.b_is_valid == false) {
+		/* get coordinator data */
+		NetInfoCoordinatorData();
+		/* Blocking process to wait Coord Data Msg */
+		sul_waiting_cdata_timer = TIMER_TO_CDATA_INFO;
+		sb_pending_cdata_cfm = true;
 		return;
 	}
 
@@ -438,7 +443,7 @@ void net_info_webcmd_process(uint8_t* buf)
 		{
 			LOG_NET_INFO_DEBUG(("Net Info manager: update dash board info\n"));
 			net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
-			http_mng_send_cmd(LNXCMS_UPDATE_NUM_DEV, 0);
+			http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
 		}
     	break;
     }

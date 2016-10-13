@@ -1,0 +1,28 @@
+#! /bin/sh
+#
+# Start PLC Manager
+#
+
+case "$1" in
+  start)
+	echo -n "Starting PLC Manager..."
+	/usr/bin/PLCManager &
+	sleep 1
+	echo "Done."
+	;;
+  stop)
+	echo -n "Stopping PLC_Manager... "
+	killall PLCManager
+	echo "Done."
+	;;
+  restart|force-reload)
+	"$0" stop
+	"$0" start
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart|force-reload}"
+	exit 1
+	;;
+esac
+
+exit $?

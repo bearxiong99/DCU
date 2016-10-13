@@ -1,0 +1,25 @@
+# Start PYTHON CLI
+
+case "$1" in
+  start)
+	echo -n "Starting DC CLI..."
+	python /usr/bin/dc_cli.py &
+	sleep 1
+	echo "Done."
+	;;
+  stop)
+	echo -n "Stopping DC CLI... "
+	killall python
+	echo "Done."
+	;;
+  restart|force-reload)
+	"$0" stop
+	"$0" start
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart|force-reload}"
+	exit 1
+	;;
+esac
+
+exit $?

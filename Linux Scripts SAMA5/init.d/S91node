@@ -1,0 +1,32 @@
+#! /bin/sh
+#
+# Start Node Web Server
+#
+
+export PATH=$PATH:/usr/local/bin
+export NODE_PATH=$NODE_PATH:/usr/lib/node_modules:/usr/local/lib/node_modules
+
+case "$1" in
+  start)
+	echo -n "Starting Web Server..."
+	cd /home/DCWS/
+	npm start &
+	sleep 1
+	echo "Done."
+	;;
+  stop)
+	echo -n "Stopping Web Server... "
+	killall node
+	echo "Done."
+	;;
+  restart|force-reload)
+	"$0" stop
+	"$0" start
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart|force-reload}"
+	exit 1
+	;;
+esac
+
+exit $?

@@ -15,7 +15,8 @@ enum net_info_mng_webcmds {
 };
 
 enum net_info_mng_lnxcmds {
-	LNXCMS_UPDATE_NUM_DEV = 0x40,
+	LNXCMS_UPDATE_DASHBOARD = 0x40,
+	LNXCMS_UPDATE_PATHLIST,
 	LNXCMS_INVALD
 };
 

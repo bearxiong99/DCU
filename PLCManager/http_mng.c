@@ -53,7 +53,8 @@ static uint16_t _build_post_query(uint8_t uc_cmd, void *pv_data)
 	(void)pv_data;
 
 	switch(uc_cmd) {
-	case LNXCMS_UPDATE_NUM_DEV:
+	case LNXCMS_UPDATE_DASHBOARD:
+	case LNXCMS_UPDATE_PATHLIST:
 		sprintf(page, "[{%clnxcmd%c:%u}]", sc_com, sc_com, uc_cmd);
 		us_len = sprintf((char *)suc_http_tx_buf, tpl, HOST, PORT, strlen(page), page);
 		break;
@@ -76,7 +77,7 @@ static void _http_rcv_cmd(uint8_t* buf, uint16_t buflen)
 
     puc_buf = buf;
 
-    LOG_HTTP_DEBUG(("%s\r\n\r\n", puc_buf));
+    //LOG_HTTP_DEBUG(("%s\r\n\r\n", puc_buf));
 
     puc_cmd = (uint8_t *)strstr(puc_buf, "webcmd");
     if (puc_cmd) {
@@ -140,7 +141,7 @@ void http_mng_send_cmd(uint8_t uc_cmd, void *pv_data)
 			socket_dettach_connection(PLC_MNG_HTTP_MNG_APP_ID, si_http_socket_fd);
 			sb_http_connect = false;
 		} else {
-			LOG_HTTP_DEBUG(("PLC message sended:\r\n%s\r\n", suc_http_tx_buf));
+			LOG_HTTP_DEBUG(("PLC message sended:\r\n%u\r\n", uc_cmd));
 		}
 	}
 
