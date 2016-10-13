@@ -1,0 +1,32 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		NodeWSUp
+# Required-Start:	$PLCMngUp $network $remote_fs $syslog
+# Required-Stop:	$network $remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Node Web Server Up
+# Description:		Launch Node Web Server.
+### END INIT INFO
+
+#!/bin/sh
+#/etc/init.d/NodeWSUp
+
+export PATH=$PATH:/usr/local/bin
+export NODE_PATH=$NODE_PATH:/usr/local/lib/node_modules
+
+case "$1" in
+  start)
+  exec forever start --minUpTime 10000 --spinSleepTime 10000 /home/DCWeb/app.js
+  ;;
+stop)
+  exec forever stop /home/DCWeb/app.js
+  ;;
+*)
+  echo "Usage: /etc/init.d/nodeup {start|stop}"
+  exit 1
+  ;;
+esac
+
+exit 0

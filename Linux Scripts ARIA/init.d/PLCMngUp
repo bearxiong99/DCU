@@ -1,0 +1,32 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		PLCMngUp
+# Required-Start:	$network $remote_fs $syslog
+# Required-Stop:	$network $remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	PLC Manager application Up
+# Description:		Launch PLC Manager application
+### END INIT INFO
+
+#!/bin/sh
+#/etc/init.d/PLCMngUp
+
+export PATH=$PATH:/usr/local/bin
+export NODE_PATH=$NODE_PATH:/usr/local/lib/node_modules
+
+case "$1" in
+  start)
+  exec /home/PLCManager -t /dev/ttyUSB2 -b 115200
+  ;;
+stop)
+  exec killall PLCManager
+  ;;
+*)
+  echo "Usage: /etc/init.d/nodeup {start|stop}"
+  exit 1
+  ;;
+esac
+
+exit 0
