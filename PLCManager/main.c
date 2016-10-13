@@ -52,11 +52,78 @@ typedef struct {
 /* Manage Callbacks of applications */
 static pf_app_callback_t app_cbs[PLC_MNG_MAX_APP_ID];
 
+static int _getParseInt(char * _szStr, int *_iVal)
+{
+	char *endptr;
+	long tmp;
+
+	errno = 0;    /* To distinguish success/failure after call */
+	tmp = strtol(_szStr, &endptr, 10);
+
+	/* Check for various possible errors */
+	if ((errno == ERANGE && (tmp == LONG_MAX || tmp == LONG_MIN))
+	                   || (errno != 0 && tmp == 0))
+	{
+	    return -1;
+	}
+
+	if (endptr == _szStr)
+	{
+	    return -1;
+	}
+
+	/* If we got here, strtol() successfully parsed a number */
+    *_iVal = (int) tmp;
+
+    return 0;
+}
+
+static int _parse_arguments(int argc, char** argv, x_serial_args_t *serial_args)
+{
+	int c;
+
+	while (1)
+	{
+	   c = getopt (argc, argv, "t:b:");
+
+	   /* Detect the end of the options. */
+	   if (c == -1) {
+		   break;
+	   }
+
+	   switch (c)
+	   {
+	   		case 'b':
+	   			serial_args->ui_baudrate = atoi(optarg);
+	   		   	break;
+
+	   		case 't':
+	   			strncpy(serial_args->sz_tty_name, optarg, 255);
+	   			break;
+
+	   		dafault:
+	   			/* getopt_long already printed an error message. */
+	   			return -1;
+	   			break;
+           }
+    }
+	return 0;
+}
+
 int main(int argc, char** argv)
 {
 	socket_res_t i_socket_res;
 	int pi_usi_fds;
-	x_serial_args_t serial_args = {"/dev/ttyUSB0", 115200}; //{"/dev/ttyS0", 115200};
+	x_serial_args_t serial_args; // = {"/dev/ttyUSB2", 115200}; //{"/dev/ttyS0", 115200};
+
+	/* Load command line parameters */
+	if (_parse_arguments(argc,argv, &serial_args) < 0) {
+		printf("PLC Manager v%d,%d\n", PLC_MNG_VERSION_HI, PLC_MNG_VERSION_LO);
+		printf("Error, check arguments.\n");
+		printf("\t-t tty                : tty device connecting to a base node, default: /dev/ttyUSB0 \n");
+		printf("\t-b baudrate           : tty baudrate configuration, default: 115200\n");
+		exit(-1);
+	}
 
 	/* Init callbacks for applications */
 	memset(&app_cbs, 0, sizeof(app_cbs));
