@@ -27,25 +27,6 @@ static uint8_t _net_info_get_cdata(uint8_t *px_msg)
     return true;
 }
 
-static uint8_t _net_info_get_cfm(uint8_t *px_msg)
-{
-	net_info_get_cfm_t net_info_get_cfm;
-	uint8_t* ptr_info;
-
-	ptr_info = px_msg;
-
-	net_info_get_cfm.uc_id = *ptr_info++;
-	net_info_get_cfm.us_len += ((uint16_t)(*ptr_info++)) << 8;
-	net_info_get_cfm.us_len += *ptr_info++;
-	memcpy(net_info_get_cfm.puc_param_info, ptr_info, net_info_get_cfm.us_len);
-
-	if (sx_net_info_cbs.get_confirm) {
-		sx_net_info_cbs.get_confirm(&net_info_get_cfm);
-	}
-
-    return true;
-}
-
 static uint8_t _net_info_event_indication(uint8_t *px_msg, uint16_t us_len)
 {
 	net_info_event_ind_t net_info_event_ind;
@@ -83,8 +64,6 @@ static uint8_t ifaceNetInfo_api_ReceivedCmd(uint8_t *px_msg, uint16_t us_len)
     case NET_INFO_EVENT_IND:
         return _net_info_event_indication(puc_ptr, us_size_msg);
         break;
-    case NET_INFO_RSP_GET_ID:
-        return _net_info_get_cfm(puc_ptr);
         break;
     case NET_INFO_RSP_CDATA_ID:
         return _net_info_get_cdata(puc_ptr);
@@ -111,23 +90,6 @@ void ifaceNetInfo_api_init(void)
 void NetInfoSetCallbacks(net_info_callbacks_t *pf_net_info_callback)
 {
 	memcpy(&sx_net_info_cbs, pf_net_info_callback, sizeof(sx_net_info_cbs));
-}
-
-void NetInfoGetRequest(uint8_t uc_id)
-{
-    uint8_t *puc_msg;
-
-    /* Insert parameters */
-    puc_msg = spuc_serial_if_buf;
-
-    *puc_msg++ = NET_INFO_CMD_GET_ID;
-    *puc_msg++ = uc_id;
-
-    /* Send to USI */
-    sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
-
-    hal_usi_send_cmd(&sx_net_info_msg);
-
 }
 
 void NetInfoGetPathRequest(uint16_t us_short_address)

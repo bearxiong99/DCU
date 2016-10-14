@@ -9,7 +9,6 @@
 #define NET_INFO_MAX_VALUE_LENGTH (512)
 
 enum net_info_commands {
-	NET_INFO_CMD_GET_ID,
 	NET_INFO_CMD_GET_PATH_REQ,
 	NET_INFO_CMD_GET_COORD_DATA,
 	NET_INFO_CMD_INVALD
@@ -17,7 +16,6 @@ enum net_info_commands {
 
 enum net_info_responses {
 	NET_INFO_EVENT_IND,
-	NET_INFO_RSP_GET_ID,
 	NET_INFO_RSP_CDATA_ID,
 	NET_INFO_RSP_INVALD
 };

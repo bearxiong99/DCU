@@ -229,7 +229,7 @@ int net_info_report_pathlist(x_net_info_t *net_info, x_routes_info_t *routes_inf
 	uint8_t uc_hops;
 	uint8_t puc_ext_addr[24];
 
-	LOG_REPORT_DEBUG(("PATHLIST creating...\r\n"));
+//	LOG_REPORT_DEBUG(("PATHLIST creating...\r\n"));
 
 	json_fd = open(spuc_pathlist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);;
 
@@ -387,7 +387,7 @@ int net_info_report_netlist(x_net_info_t *net_info)
 	int i_ln_len, i_size_fd;
 	int json_fd;
 
-	LOG_REPORT_DEBUG(("NETLIST creating...\r\n"));
+//	LOG_REPORT_DEBUG(("NETLIST creating...\r\n"));
 
 	json_fd = open(spuc_netlist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 
@@ -448,7 +448,7 @@ int net_info_report_blacklist(x_net_info_t *net_info)
 	int i_ln_len, i_size_fd;
 	int json_fd;
 
-	LOG_REPORT_DEBUG(("BLACKLIST creating...\r\n"));
+//	LOG_REPORT_DEBUG(("BLACKLIST creating...\r\n"));
 
 	json_fd = open(spuc_blacklist_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 
@@ -501,7 +501,7 @@ int net_info_report_dev_num(x_net_info_t *net_info)
 	int i_ln_len, i_size_fd;
 	int json_fd;
 
-	LOG_REPORT_DEBUG(("DEV NUM creating...\r\n"));
+//	LOG_REPORT_DEBUG(("DEV NUM creating...\r\n"));
 
 	json_fd = open(spuc_numdev_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 
@@ -525,7 +525,7 @@ int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_st
 	int json_fd;
 	uint32_t ul_tmp;
 
-	LOG_REPORT_DEBUG(("DASHBOARD creating...\r\n"));
+//	LOG_REPORT_DEBUG(("DASHBOARD creating...\r\n"));
 
 	json_fd = open(spuc_dashboard_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 

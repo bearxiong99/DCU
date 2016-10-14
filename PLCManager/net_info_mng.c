@@ -267,13 +267,16 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 			/* reset node to request */
 			sus_node_addr_path_req = INVALID_NODE_ADDRESS;
 
+			/* Update Web server */
+			net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+			http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+
+
 			/* Report Pathlist */
 			net_info_report_pathlist(&sx_net_info, &sx_routes_info);
 			http_mng_send_cmd(LNXCMS_UPDATE_PATHLIST, 0);
 
-			/* Update Web server */
-			net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
-			http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+
 		}
 	}
 		break;
@@ -293,6 +296,9 @@ static void NetInfoCoordData(net_info_cdata_cfm_t *px_cdata)
 		sb_pending_cdata_cfm = false;
 		sul_waiting_cdata_timer = 0;
 	}
+
+	/* Update pathlist for D3 force */
+	net_info_report_pathlist(&sx_net_info, &sx_routes_info);
 }
 
 /**
@@ -401,7 +407,9 @@ void net_info_mng_init(int _app_id)
 	memset(&sx_net_statistics, 0, sizeof(sx_net_statistics));
 
 	/* reset reports */
-	net_info_report_pathlist(&sx_net_info, &sx_routes_info);
+	net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+	net_info_report_blacklist(&sx_net_info);
+	net_info_report_netlist(&sx_net_info);
 
 }
 

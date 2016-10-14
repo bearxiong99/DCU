@@ -38,7 +38,7 @@ static unsigned char suc_http_rx_buf[MAX_HTTP_BUFFER_SIZE];
 static unsigned char suc_http_tx_buf[MAX_HTTP_BUFFER_SIZE];
 
 #define HOST                     "127.0.0.1"
-#define PORT                     3000
+#define PORT                     4000
 #define MAX_BUFF_HTTP_CMD        50
 
 static const char sc_com = '"';
