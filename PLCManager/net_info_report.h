@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define NET_REPORT_DEBUG_CONSOLE
+//#define NET_REPORT_DEBUG_CONSOLE
 
 #define NUM_MAX_NODES            10
 #define NUM_MAX_BLACK_NODES      10

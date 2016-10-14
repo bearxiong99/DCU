@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "socket_handler.h"
 
-#define HTTP_DEBUG_CONSOLE
+//#define HTTP_DEBUG_CONSOLE
 
 #define VERSION_HI	                     0x01
 #define VERSION_LOW                      0x01

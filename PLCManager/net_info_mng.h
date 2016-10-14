@@ -3,9 +3,7 @@
 
 #include "socket_handler.h"
 
-#define NET_REPORT_DEBUG_CONSOLE
-
-#define NET_INFO_DEBUG_CONSOLE
+//#define NET_INFO_DEBUG_CONSOLE
 
 #define MAX_NET_INFO_SOCKET_SIZE      1000
 
