@@ -38,6 +38,9 @@ static char spuc_numdev_name[] = "/home/DCWeb/public/tables/numdev.json";
 static char spuc_dashboard_tmp_name[] = "/tmp/dashboard.json";
 static char spuc_dashboard_name[] = "/home/DCWeb/public/tables/dashboard.json";
 
+static char spuc_roundtime_tmp_name[] = "/tmp/roundtime.json";
+static char spuc_roundtime_name[] = "/home/DCWeb/public/tables/roundtime.json";
+
 //static char spuc_nodesinfo_path[] = "/home/DCWeb/public/tables/nodes/";
 
 static const char sc_comillas = '"';
@@ -536,10 +539,10 @@ int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_st
 	i_ln_len = sprintf(puc_ln_buf, "%cnumdevs%c:%u,", sc_comillas, sc_comillas, net_info->us_num_nodes);
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 	/* Number of data request */
-	i_ln_len = sprintf(puc_ln_buf, "%cnummsgs%c:%u,", sc_comillas, sc_comillas, net_stats->us_num_data_req);
+	i_ln_len = sprintf(puc_ln_buf, "%cnummsgs%c:%u,", sc_comillas, sc_comillas, net_stats->us_num_data_tx);
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 	/* Number of ping request */
-	i_ln_len = sprintf(puc_ln_buf, "%cnumpings%c:%u,", sc_comillas, sc_comillas, net_stats->us_num_ping_req);
+	i_ln_len = sprintf(puc_ln_buf, "%cnumpings%c:%u,", sc_comillas, sc_comillas, net_stats->us_num_ping_tx);
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 	/* Number of path request */
 	i_ln_len = sprintf(puc_ln_buf, "%cnumpaths%c:%u,", sc_comillas, sc_comillas, net_info->us_num_path_nodes);
@@ -555,8 +558,8 @@ int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_st
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 
 	/* Data coverage */
-	if (net_stats->us_num_data_req) {
-		ul_tmp = (net_stats->us_num_data_succ * 100) / net_stats->us_num_data_req;
+	if (net_stats->us_num_data_tx) {
+		ul_tmp = (net_stats->us_num_data_rx * 100) / net_stats->us_num_data_tx;
 	} else {
 		ul_tmp = 0;
 	}
@@ -564,8 +567,8 @@ int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_st
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 
 	/* Ping success */
-	if (net_stats->us_num_ping_req) {
-		ul_tmp = (net_stats->us_num_ping_succ * 100) / net_stats->us_num_ping_req;
+	if (net_stats->us_num_ping_tx) {
+		ul_tmp = (net_stats->us_num_ping_rx * 100) / net_stats->us_num_ping_tx;
 	} else {
 		ul_tmp = 0;
 	}
@@ -592,6 +595,40 @@ int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_st
 	_mov_file(spuc_dashboard_tmp_name, spuc_dashboard_name);
 
 	LOG_REPORT_DEBUG(("DASHBOARD created\r\n"));
+
+	return (i_size_fd);
+}
+
+int net_info_report_round_time(int i_round_time, uint16_t us_short_addr)
+{
+	char puc_ln_buf[20];
+	int i_ln_len, i_size_fd;
+	int json_fd;
+	uint32_t ul_tmp;
+
+//	char puc_date_buf[20];
+//	time_t t = time(NULL);
+//
+//	struct tm *tm = localtime(&t);
+//	sprintf(puc_date_buf, "%c%u:%u:%u%c", sc_comillas, tm->tm_hour, tm->tm_min, tm->tm_sec, sc_comillas);
+
+//	LOG_REPORT_DEBUG(("Round Time creating...\r\n"));
+
+	json_fd = open(spuc_roundtime_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+
+	/* Number of devices */
+	i_ln_len = sprintf(puc_ln_buf, "{%clabel%c:%c0x%04x%c,", sc_comillas, sc_comillas, sc_comillas, us_short_addr, sc_comillas);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+	/* Number of data request */
+	i_ln_len = sprintf(puc_ln_buf, "%cdata%c:%u}", sc_comillas, sc_comillas, i_round_time);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	close(json_fd);
+
+	/* Move temporal file to WebServer folder */
+	_mov_file(spuc_roundtime_tmp_name, spuc_roundtime_name);
+
+	LOG_REPORT_DEBUG(("Round Time created\r\n"));
 
 	return (i_size_fd);
 }

@@ -24,6 +24,10 @@ typedef enum net_info_events {
 	NET_INFO_UPDATE_NODE_LIST = 0,
 	NET_INFO_UPDATE_BLACK_LIST,
 	NET_INFO_UPDATE_PATH_INFO,
+	NET_INFO_DATA_TX_ICMP,
+	NET_INFO_DATA_RX_ICMP,
+	NET_INFO_DATA_TX_UDP,
+	NET_INFO_DATA_RX_UDP,
 	NET_INFO_EV_INVALID
 } net_info_events_t;
 
@@ -51,7 +55,7 @@ typedef void (*pf_get_cdata_t)(net_info_cdata_cfm_t *px_coord_data);
 typedef struct net_info_callbacks {
 	/* Callback for Get Confirm */
 	pf_get_confirm_t get_confirm;
-	/* Callback for Event Indication */
+	/* Callback for Network Event Indication */
 	pf_event_indication_t event_indication;
 	/* Callback for Get Coordinator Data */
 	pf_get_cdata_t coordinator_data;

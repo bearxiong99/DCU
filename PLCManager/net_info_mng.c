@@ -7,6 +7,8 @@
 #include <string.h>
 #include <fcntl.h>
 
+#include "sys/time.h"
+
 #include "socket_handler.h"
 #include "ifaceNet_api.h"
 #include "net_info_mng.h"
@@ -33,6 +35,9 @@ static uint16_t sus_node_addr_path_req;
 static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
 
+/* ICMP Round time */
+static int si_icmp_round_timer_start;
+static int si_icmp_round_time;
 
 /* Waiting Process timer */
 static uint32_t sul_waiting_cdata_timer;
@@ -44,6 +49,17 @@ static uint32_t sul_waiting_preq_timer;
 
 /* Statistics */
 static uint32_t sul_preq_requests;
+
+static int _get_timestamp()
+{
+    struct timeval te;
+    int ms;
+
+    gettimeofday(&te, NULL);
+    ms = te.tv_sec*1000 + te.tv_usec/1000;
+
+    return ms;
+}
 
 static void _start_preq_next_request(void)
 {
@@ -281,6 +297,48 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 	}
 		break;
 
+	case NET_INFO_DATA_TX_ICMP:
+		/* update statistics */
+		si_icmp_round_timer_start = _get_timestamp();
+		sx_net_statistics.us_num_ping_tx++;
+		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+		printf("ICMP TX\r\n");
+		break;
+
+	case NET_INFO_DATA_RX_ICMP:
+	{
+		uint16_t us_node_addr;
+
+		us_node_addr = _extract_u16(puc_ev_info);
+
+		/* update statistics */
+		si_icmp_round_time = _get_timestamp() - si_icmp_round_timer_start;
+		sx_net_statistics.us_num_ping_rx++;
+		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+		//http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0); --> In Update Rountime Routine
+		net_info_report_round_time(si_icmp_round_time, us_node_addr);
+		http_mng_send_cmd(LNXCMS_UPDATE_ROUNDTIME, 0);
+		printf("ICMP RX\r\n");
+	}
+		break;
+
+	case NET_INFO_DATA_TX_UDP:
+		/* update statistics */
+		sx_net_statistics.us_num_data_tx++;
+		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+		printf("UDP TX\r\n");
+		break;
+
+	case NET_INFO_DATA_RX_UDP:
+		/* update statistics */
+		sx_net_statistics.us_num_data_rx++;
+		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+		printf("UDP RX\r\n");
+		break;
+
 	}
 
 }
@@ -308,7 +366,6 @@ static void NetInfoCoordData(net_info_cdata_cfm_t *px_cdata)
  */
 void net_info_mng_process(void)
 {
-
 	if (sul_waiting_cdata_timer) {
 		sul_waiting_cdata_timer--;
 		return;

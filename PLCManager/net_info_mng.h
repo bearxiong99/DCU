@@ -15,6 +15,7 @@ enum net_info_mng_webcmds {
 enum net_info_mng_lnxcmds {
 	LNXCMS_UPDATE_DASHBOARD = 0x40,
 	LNXCMS_UPDATE_PATHLIST,
+	LNXCMS_UPDATE_ROUNDTIME,
 	LNXCMS_INVALD
 };
 
