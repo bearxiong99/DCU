@@ -14,6 +14,7 @@
 #include "net_info_mng.h"
 #include "net_info_report.h"
 #include "http_mng.h"
+#include "gpio.h"
 
 #ifdef NET_INFO_DEBUG_CONSOLE
 #	define LOG_NET_INFO_DEBUG(a)   printf a
@@ -22,9 +23,6 @@
 #endif
 
 static int si_net_info_id;
-static int si_net_info_link_fd;
-static int si_net_info_data_fd;
-static unsigned char suc_net_info_buf[MAX_NET_INFO_SOCKET_SIZE];
 
 static net_info_cdata_cfm_t sx_coord_data;
 static x_net_info_t sx_net_info;
@@ -46,9 +44,6 @@ static uint32_t sul_waiting_preq_timer;
 /* Timers based on 10 ms */
 #define TIMER_TO_CDATA_INFO       500 // 5 seconds
 #define TIMER_TO_REQ_PATH_INFO    500 // 5 seconds
-
-/* Statistics */
-static uint32_t sul_preq_requests;
 
 static int _get_timestamp()
 {
@@ -441,8 +436,12 @@ void net_info_mng_process(void)
 void net_info_mng_init(int _app_id)
 {
 	net_info_callbacks_t net_info_callbacks;
-
 	si_net_info_id = _app_id;
+
+	/* Configure RESET and ERASE pinout */
+	GPIOExport(RESET_GPIO_ID);
+	GPIODirection(RESET_GPIO_ID, GPIO_OUT);
+	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
 
 	memset(&sx_net_info, 0, sizeof(sx_net_info));
 	memset(&sx_coord_data, 0, sizeof(sx_coord_data));

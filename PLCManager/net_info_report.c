@@ -497,9 +497,6 @@ int net_info_report_blacklist(x_net_info_t *net_info)
 
 int net_info_report_dev_num(x_net_info_t *net_info)
 {
-	uint8_t *ptr_mac;
-	uint16_t us_node_idx;
-	uint8_t puc_ext_addr[24];
 	char puc_ln_buf[96];
 	int i_ln_len, i_size_fd;
 	int json_fd;
@@ -604,7 +601,6 @@ int net_info_report_round_time(int i_round_time, uint16_t us_short_addr)
 	char puc_ln_buf[20];
 	int i_ln_len, i_size_fd;
 	int json_fd;
-	uint32_t ul_tmp;
 
 //	char puc_date_buf[20];
 //	time_t t = time(NULL);

@@ -7,6 +7,15 @@
 
 #define MAX_NET_INFO_SOCKET_SIZE      1000
 
+#define RESET_GPIO_ID          4  // S19:PA4
+#define ERASE_GPIO_ID          2  // S21:PA2
+
+#define RESET_GPIO_ENABLE      0
+#define RESET_GPIO_DISABLE     1
+
+#define ERASE_GPIO_ENABLE      1
+#define ERASE_GPIO_DISABLE     0
+
 enum net_info_mng_webcmds {
 	WEBCMD_UPDATE_DASHBOARD = 0x30,
 	WEBCMD_INVALD

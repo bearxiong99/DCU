@@ -52,32 +52,6 @@ typedef struct {
 /* Manage Callbacks of applications */
 static pf_app_callback_t app_cbs[PLC_MNG_MAX_APP_ID];
 
-static int _getParseInt(char * _szStr, int *_iVal)
-{
-	char *endptr;
-	long tmp;
-
-	errno = 0;    /* To distinguish success/failure after call */
-	tmp = strtol(_szStr, &endptr, 10);
-
-	/* Check for various possible errors */
-	if ((errno == ERANGE && (tmp == LONG_MAX || tmp == LONG_MIN))
-	                   || (errno != 0 && tmp == 0))
-	{
-	    return -1;
-	}
-
-	if (endptr == _szStr)
-	{
-	    return -1;
-	}
-
-	/* If we got here, strtol() successfully parsed a number */
-    *_iVal = (int) tmp;
-
-    return 0;
-}
-
 static int _parse_arguments(int argc, char** argv, x_serial_args_t *serial_args)
 {
 	int c;
@@ -101,7 +75,7 @@ static int _parse_arguments(int argc, char** argv, x_serial_args_t *serial_args)
 	   			strncpy(serial_args->sz_tty_name, optarg, 255);
 	   			break;
 
-	   		dafault:
+	   		default:
 	   			/* getopt_long already printed an error message. */
 	   			return -1;
 	   			break;

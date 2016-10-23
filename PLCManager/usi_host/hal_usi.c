@@ -841,7 +841,6 @@ void hal_usi_process(void)
 	uint8_t *puc_first_token;
 	uint8_t *puc_last_token;
 	uint16_t us_msg_size;
-	uint16_t us_msg_size_new = 0;
 	uint16_t us_msg_size_pending;
 	int i_msg_size_new;
 
