@@ -41,6 +41,9 @@ static char spuc_dashboard_name[] = "/home/DCWeb/public/tables/dashboard.json";
 static char spuc_roundtime_tmp_name[] = "/tmp/roundtime.json";
 static char spuc_roundtime_name[] = "/home/DCWeb/public/tables/roundtime.json";
 
+static char spuc_throughput_tmp_name[] = "/tmp/throughput.json";
+static char spuc_throughput_name[] = "/home/DCWeb/public/tables/throughput.json";
+
 //static char spuc_nodesinfo_path[] = "/home/DCWeb/public/tables/nodes/";
 
 static const char sc_comillas = '"';
@@ -612,10 +615,10 @@ int net_info_report_round_time(int i_round_time, uint16_t us_short_addr)
 
 	json_fd = open(spuc_roundtime_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 
-	/* Number of devices */
+	/* Number of device */
 	i_ln_len = sprintf(puc_ln_buf, "{%clabel%c:%c0x%04x%c,", sc_comillas, sc_comillas, sc_comillas, us_short_addr, sc_comillas);
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
-	/* Number of data request */
+	/* Roudn Time */
 	i_ln_len = sprintf(puc_ln_buf, "%cdata%c:%u}", sc_comillas, sc_comillas, i_round_time);
 	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
 
@@ -628,5 +631,31 @@ int net_info_report_round_time(int i_round_time, uint16_t us_short_addr)
 
 	return (i_size_fd);
 }
+
+int net_info_report_data_throughput(int i_data_throughput, uint16_t us_short_addr)
+{
+	char puc_ln_buf[20];
+	int i_ln_len, i_size_fd;
+	int json_fd;
+
+	json_fd = open(spuc_throughput_tmp_name, O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+
+	/* Number of device */
+	i_ln_len = sprintf(puc_ln_buf, "{%clabel%c:%c0x%04x%c,", sc_comillas, sc_comillas, sc_comillas, us_short_addr, sc_comillas);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+	/* Data throughput */
+	i_ln_len = sprintf(puc_ln_buf, "%cdata%c:%u}", sc_comillas, sc_comillas, i_data_throughput);
+	i_size_fd = write(json_fd, puc_ln_buf, i_ln_len);
+
+	close(json_fd);
+
+	/* Move temporal file to WebServer folder */
+	_mov_file(spuc_throughput_tmp_name, spuc_throughput_name);
+
+	LOG_REPORT_DEBUG(("Throughput created\r\n"));
+
+	return (i_size_fd);
+}
+
 
 

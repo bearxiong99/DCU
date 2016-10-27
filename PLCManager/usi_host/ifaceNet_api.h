@@ -28,6 +28,7 @@ typedef enum net_info_events {
 	NET_INFO_DATA_RX_ICMP,
 	NET_INFO_DATA_TX_UDP,
 	NET_INFO_DATA_RX_UDP,
+	NET_INFO_ADP_EVENT,
 	NET_INFO_EV_INVALID
 } net_info_events_t;
 

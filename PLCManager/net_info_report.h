@@ -86,5 +86,6 @@ int net_info_report_path_info(uint16_t us_node_addr, uint8_t *puc_ext_addr, x_pa
 int net_info_report_dev_num(x_net_info_t *net_info);
 int net_info_report_dashboard(x_net_info_t *net_info, x_net_statistics_t *net_stats);
 int net_info_report_round_time(int i_round_time, uint16_t us_short_addr);
+int net_info_report_data_throughput(int i_data_throughput, uint16_t us_short_addr);
 
 #endif /* NET_INFO_REPORT_H_INCLUDED */

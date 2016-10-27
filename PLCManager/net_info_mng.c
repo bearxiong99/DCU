@@ -35,7 +35,11 @@ static bool sb_pending_cdata_cfm;
 
 /* ICMP Round time */
 static int si_icmp_round_timer_start;
-static int si_icmp_round_time;
+
+/* Data throughput */
+static int si_data_thrp_timer_start;
+static int si_data_thrp_time;
+static int si_data_thrp_length_tx;
 
 /* Waiting Process timer */
 static uint32_t sul_waiting_cdata_timer;
@@ -45,7 +49,31 @@ static uint32_t sul_waiting_preq_timer;
 #define TIMER_TO_CDATA_INFO       500 // 5 seconds
 #define TIMER_TO_REQ_PATH_INFO    500 // 5 seconds
 
-static int _get_timestamp()
+static void _init_reset_plc(void)
+{
+	/* Configure ERASE pinout */
+//	GPIOExport(ERASE_GPIO_ID);
+//	GPIODirection(ERASE_GPIO_ID, GPIO_OUT);
+//	GPIOWrite(ERASE_GPIO_ID, ERASE_GPIO_DISABLE);
+//	usleep(500);
+	/* Configure RESET */
+	GPIOExport(RESET_GPIO_ID);
+	GPIODirection(RESET_GPIO_ID, GPIO_OUT);
+
+	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
+	usleep(500);
+}
+
+static void _reset_plc(void)
+{
+	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_ENABLE);
+	usleep(500);
+
+	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
+	usleep(500);
+}
+
+static int _get_timestamp_ms(void)
 {
     struct timeval te;
     int ms;
@@ -173,6 +201,21 @@ static void _clear_path_info(uint16_t us_node_addr)
 	}
 }
 
+static void _process_adp_event(uint8_t *puc_ev_data)
+{
+	uint8_t *puc_data_ptr;
+	uint8_t uc_adp_event;
+
+	puc_data_ptr = puc_ev_data;
+
+	uc_adp_event = *puc_data_ptr++;
+	switch(uc_adp_event) {
+	case NET_INFO_ADP_DATA_REQ:
+		break;
+
+	}
+}
+
 static void NetInfoGetConfirm(net_info_get_cfm_t *px_cfm_info)
 {
 
@@ -294,7 +337,7 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 	case NET_INFO_DATA_TX_ICMP:
 		/* update statistics */
-		si_icmp_round_timer_start = _get_timestamp();
+		si_icmp_round_timer_start = _get_timestamp_ms();
 		sx_net_statistics.us_num_ping_tx++;
 		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
 		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
@@ -304,34 +347,55 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 	case NET_INFO_DATA_RX_ICMP:
 	{
 		uint16_t us_node_addr;
+		int i_icmp_round_time;
 
 		us_node_addr = _extract_u16(puc_ev_info);
 
 		/* update statistics */
-		si_icmp_round_time = _get_timestamp() - si_icmp_round_timer_start;
+		i_icmp_round_time = _get_timestamp_ms() - si_icmp_round_timer_start;
 		sx_net_statistics.us_num_ping_rx++;
 		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
 		//http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0); --> In Update Rountime Routine
-		net_info_report_round_time(si_icmp_round_time, us_node_addr);
+		net_info_report_round_time(i_icmp_round_time, us_node_addr);
 		http_mng_send_cmd(LNXCMS_UPDATE_ROUNDTIME, 0);
 		printf("ICMP RX\r\n");
 	}
 		break;
 
 	case NET_INFO_DATA_TX_UDP:
+	{
 		/* update statistics */
+		si_data_thrp_length_tx = us_ev_size;
+		si_data_thrp_timer_start = _get_timestamp_ms();
 		sx_net_statistics.us_num_data_tx++;
 		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
 		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
 		printf("UDP TX\r\n");
+	}
 		break;
 
 	case NET_INFO_DATA_RX_UDP:
+	{
+		uint16_t us_node_addr;
+		int i_data_throughput;
+
+		us_node_addr = _extract_u16(puc_ev_info);
+
 		/* update statistics */
+		si_data_thrp_length_tx += us_ev_size;
+		si_data_thrp_time = _get_timestamp_ms() - si_data_thrp_timer_start;
+		i_data_throughput = si_data_thrp_length_tx * 1000 / si_data_thrp_time;
 		sx_net_statistics.us_num_data_rx++;
-		net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
-		http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+		//net_info_report_dashboard(&sx_net_info, &sx_net_statistics);  --> In Update Throughput Routine
+		net_info_report_data_throughput(i_data_throughput, us_node_addr);
+		http_mng_send_cmd(LNXCMS_UPDATE_THROUGHPUT, 0);
+
 		printf("UDP RX\r\n");
+	}
+		break;
+
+	case NET_INFO_ADP_EVENT:
+		_process_adp_event(puc_ev_info);
 		break;
 
 	}
@@ -438,10 +502,8 @@ void net_info_mng_init(int _app_id)
 	net_info_callbacks_t net_info_callbacks;
 	si_net_info_id = _app_id;
 
-	/* Configure RESET and ERASE pinout */
-	GPIOExport(RESET_GPIO_ID);
-	GPIODirection(RESET_GPIO_ID, GPIO_OUT);
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
+	_init_reset_plc();
+	_reset_plc();
 
 	memset(&sx_net_info, 0, sizeof(sx_net_info));
 	memset(&sx_coord_data, 0, sizeof(sx_coord_data));
