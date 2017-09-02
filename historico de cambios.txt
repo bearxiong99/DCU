@@ -1,0 +1,12 @@
+Historico de Cambios:
+
+Rama embebdida: asf_ch      [git@10.140.30.70:repositories/cristian.guemes/asf.git]
+Rama linux:     G3_Gateway  [https://github.com/chrisguemes/DCU.git]
+02/09/2017: Sincronizadas ambas apps. Testeadas y funcionan.
+tag ADP_EVENTS: (tag creada en ambos repositorios)
+	"Funciona: La app de linux pide los PREQ (path request) y va construyendo el arbol en JSON. La app emb reporta eventos de adp, tráfico IP, tráfico TCP, y lista de nodos."
+	
+	
+Se crea nueva rama para minimizar funcionalidades. Solo GW, se extrae información del gateway (como la tabla de vecinos), pero no se controla el resto de nodos de la red.
+Rama embebdida: asf_ch_min      [git@10.140.30.70:repositories/cristian.guemes/asf.git]
+Rama linux:     G3_Gateway_min  [https://github.com/chrisguemes/DCU.git]
