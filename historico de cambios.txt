@@ -10,3 +10,35 @@ tag ADP_EVENTS: (tag creada en ambos repositorios)
 Se crea nueva rama para minimizar funcionalidades. Solo GW, se extrae información del gateway (como la tabla de vecinos), pero no se controla el resto de nodos de la red.
 Rama embebdida: asf_ch_min      [git@10.140.30.70:repositories/cristian.guemes/asf.git]
 Rama linux:     G3_Gateway_min  [https://github.com/chrisguemes/DCU.git]
+
+
+
+
+
+
+
+
+
+
+Pendiente: [Centrate en solamente en operaciones GET, no SET]
+- PLC Manager (linux):
+	- Estadísticas:
+		- De sistema (RAM, process...)
+	- Gestion Configuracion. Crear un objeto JSON por cada tipo de configuración(AppCfg, GatewayCfg, G3NetworkCfg) . Luego NODE accedera directamente a estos ficheros de configuración para su representación en la WEB.
+
+- DCWeb (Node):
+	- Estadísticas:
+		- Comunicaciones LAN (eth0)
+		- Comunicaciones G3 (ppp0)
+	- Gestion Configuracion. Recepción del comando de actualización de configuración. Lectura de los Objetos JSON y actualización de los ID de la vista.
+		
+	- Gestión de usuario (mirar youtube nodejs login)
+	- Si da tiempo, que no creo... nueva vista de ADPRoutingTable.
+	
+	
+		
+		
+		
+		
+		
+		
