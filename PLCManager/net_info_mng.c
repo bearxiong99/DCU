@@ -9,6 +9,7 @@
 
 #include "sys/time.h"
 
+#include "config.h"
 #include "socket_handler.h"
 #include "ifaceNet_api.h"
 #include "net_info_mng.h"
@@ -28,12 +29,8 @@ static int si_net_info_id;
 static x_coord_data_t sx_coord_data;
 
 /* Connection status */
-#define DLMS_MAX_DEV_NUM                  500
 static uint16_t sus_num_devices;
-static x_dev_addr_t spx_current_addr_list[DLMS_MAX_DEV_NUM];
-
-/* Invalid short address (0 can only be the coordinator) */
-#define LBS_INVALID_SHORT_ADDRESS         0
+static x_dev_addr_t spx_current_addr_list[NUM_MAX_NODES];
 
 static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
@@ -49,10 +46,10 @@ static uint32_t sul_waiting_preq_timer;
 static void _init_reset_plc(void)
 {
 	/* Configure ERASE pinout */
-//	GPIOExport(ERASE_GPIO_ID);
-//	GPIODirection(ERASE_GPIO_ID, GPIO_OUT);
-//	GPIOWrite(ERASE_GPIO_ID, ERASE_GPIO_DISABLE);
-//	usleep(500);
+	GPIOExport(ERASE_GPIO_ID);
+	GPIODirection(ERASE_GPIO_ID, GPIO_OUT);
+	GPIOWrite(ERASE_GPIO_ID, ERASE_GPIO_DISABLE);
+	usleep(500);
 	/* Configure RESET */
 	GPIOExport(RESET_GPIO_ID);
 	GPIODirection(RESET_GPIO_ID, GPIO_OUT);
@@ -67,7 +64,7 @@ static void _reset_plc(void)
 	usleep(500);
 
 	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
-	usleep(500);
+	usleep(5000);
 }
 
 //static int _get_timestamp_ms(void)
@@ -80,6 +77,14 @@ static void _reset_plc(void)
 //
 //    return ms;
 //}
+
+static void _reset_node_list(void)
+{
+	memset(spx_current_addr_list, 0, sizeof(spx_current_addr_list));
+	sus_num_devices = 0;
+	/* update reports for node list */
+	net_info_report_devlist(spx_current_addr_list, sus_num_devices);
+}
 
 static uint16_t _extract_u16(void *vptr_value) {
 	uint16_t us_val_swap;
@@ -108,7 +113,7 @@ static void _join_node(uint16_t us_short_address, uint8_t *puc_extended_address)
 	LOG_NET_INFO_DEBUG(("[NET_INFO] _join_node: short_address = %hu extended addr %s\n", us_short_address, puc_ext_addr_ascii));
 
 	/* Search if node is already in cycle list */
-	for (us_node_idx = 0; us_node_idx < DLMS_MAX_DEV_NUM; us_node_idx++) {
+	for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
 		if (!memcmp(spx_current_addr_list[us_node_idx].puc_ext_addr, puc_extended_address, 8)) {
 			b_already_connected = true;
 			spx_current_addr_list[us_node_idx].us_short_addr = us_short_address;
@@ -118,7 +123,7 @@ static void _join_node(uint16_t us_short_address, uint8_t *puc_extended_address)
 
 	if (!b_already_connected) {
 		/* Add node to cycle list */
-		for (us_node_idx = 0; us_node_idx < DLMS_MAX_DEV_NUM; us_node_idx++) {
+		for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
 			if (spx_current_addr_list[us_node_idx].us_short_addr == LBS_INVALID_SHORT_ADDRESS) {
 				spx_current_addr_list[us_node_idx].us_short_addr = us_short_address;
 				memcpy(spx_current_addr_list[us_node_idx].puc_ext_addr, puc_extended_address, 8);
@@ -126,6 +131,11 @@ static void _join_node(uint16_t us_short_address, uint8_t *puc_extended_address)
 				break;
 			}
 		}
+
+		/* update reports for node list */
+		net_info_report_devlist(spx_current_addr_list, sus_num_devices);
+		/* Update web interface */
+		http_mng_send_cmd(LNXCMD_REFRESH_DEVLIST, 0);
 	}
 }
 
@@ -134,11 +144,16 @@ static void _leave_node(uint16_t us_short_address)
 	uint16_t us_node_idx;
 
 	/* Reset node in cycle list */
-	for (us_node_idx = 0; us_node_idx < DLMS_MAX_DEV_NUM; us_node_idx++) {
+	for (us_node_idx = 0; us_node_idx < NUM_MAX_NODES; us_node_idx++) {
 		if (spx_current_addr_list[us_node_idx].us_short_addr == us_short_address) {
 			spx_current_addr_list[us_node_idx].us_short_addr = LBS_INVALID_SHORT_ADDRESS;
 			memset(spx_current_addr_list[us_node_idx].puc_ext_addr, 0x00, 8);
 			sus_num_devices--;
+
+			/* update reports for node list */
+			net_info_report_devlist(spx_current_addr_list, sus_num_devices);
+			/* Update web interface */
+			http_mng_send_cmd(LNXCMD_REFRESH_DEVLIST, 0);
 			break;
 		}
 	}
@@ -159,8 +174,7 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 	switch(uc_adp_event) {
 
 	case NET_INFO_ADP_NET_START_CFM:
-		memset(spx_current_addr_list, 0, sizeof(spx_current_addr_list));
-		sus_num_devices = 0;
+		_reset_node_list();
 		break;
 
 	case NET_INFO_ADP_JOIN_IND:
@@ -279,8 +293,7 @@ void net_info_mng_init(int _app_id)
 	net_info_callbacks_t net_info_callbacks;
 	si_net_info_id = _app_id;
 
-	memset(spx_current_addr_list, 0, sizeof(spx_current_addr_list));
-	sus_num_devices = 0;
+	_reset_node_list();
 
 	_init_reset_plc();
 	_reset_plc();
@@ -330,11 +343,11 @@ void net_info_webcmd_process(uint8_t* buf)
     puc_buf = buf;
 
     switch (*puc_buf) {
-    case WEBCMD_UPDATE_DASHBOARD:
+    case WEBCMD_UPDATE_DEVLIST:
 		{
 			LOG_NET_INFO_DEBUG(("Net Info manager: update dash board info\n"));
 			//net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
-			http_mng_send_cmd(LNXCMS_UPDATE_DASHBOARD, 0);
+			http_mng_send_cmd(LNXCMD_REFRESH_DEVLIST, 0);
 		}
     	break;
     }

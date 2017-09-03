@@ -53,10 +53,7 @@ static uint16_t _build_post_query(uint8_t uc_cmd, void *pv_data)
 	(void)pv_data;
 
 	switch(uc_cmd) {
-	case LNXCMS_UPDATE_DASHBOARD:
-	case LNXCMS_UPDATE_PATHLIST:
-	case LNXCMS_UPDATE_ROUNDTIME:
-	case LNXCMS_UPDATE_THROUGHPUT:
+	case LNXCMD_REFRESH_DEVLIST:
 		sprintf(page, "[{%clnxcmd%c:%u}]", sc_com, sc_com, uc_cmd);
 		us_len = sprintf((char *)suc_http_tx_buf, tpl, HOST, PORT, strlen(page), page);
 		break;

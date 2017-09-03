@@ -1,6 +1,8 @@
 #ifndef NET_INFO_MNG_H_INCLUDED
 #define NET_INFO_MNG_H_INCLUDED
 
+#include <stdbool.h>
+#include <stdint.h>
 #include "socket_handler.h"
 
 //#define NET_INFO_DEBUG_CONSOLE
@@ -16,27 +18,24 @@
 #define ERASE_GPIO_ENABLE      1
 #define ERASE_GPIO_DISABLE     0
 
-typedef struct sx_coord_data {
+typedef struct x_coord_data {
 	bool b_is_valid;
 	uint8_t puc_ext_addr[8];
 } x_coord_data_t;
 
-typedef struct {
+typedef struct x_dev_addr {
 	uint16_t us_short_addr;
 	uint8_t puc_ext_addr[8];
 } x_dev_addr_t;
 
 enum net_info_mng_webcmds {
-	WEBCMD_UPDATE_DASHBOARD = 0x30,
+	WEBCMD_UPDATE_DEVLIST = 0x30,
 	WEBCMD_INVALD
 };
 
 enum net_info_mng_lnxcmds {
-	LNXCMS_UPDATE_DASHBOARD = 0x40,
-	LNXCMS_UPDATE_PATHLIST,
-	LNXCMS_UPDATE_ROUNDTIME,
-	LNXCMS_UPDATE_THROUGHPUT,
-	LNXCMS_INVALD
+	LNXCMD_REFRESH_DEVLIST = 0x40,
+	LNXCMD_INVALD
 };
 
 enum net_info_adp_event_id
