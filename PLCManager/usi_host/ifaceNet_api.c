@@ -18,15 +18,6 @@ x_usi_cmd_t sx_net_info_msg;
 
 static net_info_callbacks_t sx_net_info_cbs;
 
-static uint8_t _net_info_get_cdata(uint8_t *px_msg)
-{
-	if (sx_net_info_cbs.coordinator_data) {
-		sx_net_info_cbs.coordinator_data((net_info_cdata_cfm_t *)px_msg);
-	}
-
-    return true;
-}
-
 static uint8_t _net_info_event_indication(uint8_t *px_msg, uint16_t us_len)
 {
 	net_info_event_ind_t net_info_event_ind;
@@ -64,10 +55,6 @@ static uint8_t ifaceNetInfo_api_ReceivedCmd(uint8_t *px_msg, uint16_t us_len)
     case NET_INFO_EVENT_IND:
         return _net_info_event_indication(puc_ptr, us_size_msg);
         break;
-        break;
-    case NET_INFO_RSP_CDATA_ID:
-        return _net_info_get_cdata(puc_ptr);
-        break;
     default:
         return false;
         break;
@@ -92,37 +79,45 @@ void NetInfoSetCallbacks(net_info_callbacks_t *pf_net_info_callback)
 	memcpy(&sx_net_info_cbs, pf_net_info_callback, sizeof(sx_net_info_cbs));
 }
 
-void NetInfoGetPathRequest(uint16_t us_short_address)
+void NetInfoAdpMacGetRequest(uint32_t ul_att_id, uint16_t us_att_index)
 {
     uint8_t *puc_msg;
 
     /* Insert parameters */
     puc_msg = spuc_serial_if_buf;
 
-    *puc_msg++ = NET_INFO_CMD_GET_PATH_REQ;
-    *puc_msg++ = (uint8_t)(us_short_address >> 8);
-    *puc_msg++ = (uint8_t)us_short_address;
+    *puc_msg++ = NET_INFO_CMD_ADP_MAC_GET;
+    *puc_msg++ = (uint8_t)(ul_att_id >> 24);
+    *puc_msg++ = (uint8_t)(ul_att_id >> 16);
+    *puc_msg++ = (uint8_t)(ul_att_id >> 8);
+    *puc_msg++ = (uint8_t)ul_att_id;
+    *puc_msg++ = (uint8_t)(us_att_index >> 8);
+    *puc_msg++ = (uint8_t)us_att_index;
 
     /* Send to USI */
     sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
 
     hal_usi_send_cmd(&sx_net_info_msg);
-
 }
 
-void NetInfoCoordinatorData(void)
+void NetInfoAdpGetRequest(uint32_t ul_att_id, uint16_t us_att_index)
 {
     uint8_t *puc_msg;
 
     /* Insert parameters */
     puc_msg = spuc_serial_if_buf;
 
-    *puc_msg++ = NET_INFO_CMD_GET_COORD_DATA;
+    *puc_msg++ = NET_INFO_CMD_ADP_GET;
+    *puc_msg++ = (uint8_t)(ul_att_id >> 24);
+    *puc_msg++ = (uint8_t)(ul_att_id >> 16);
+    *puc_msg++ = (uint8_t)(ul_att_id >> 8);
+    *puc_msg++ = (uint8_t)ul_att_id;
+    *puc_msg++ = (uint8_t)(us_att_index >> 8);
+    *puc_msg++ = (uint8_t)us_att_index;
 
     /* Send to USI */
     sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
 
     hal_usi_send_cmd(&sx_net_info_msg);
-
 }
 

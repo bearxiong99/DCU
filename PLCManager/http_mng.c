@@ -75,7 +75,6 @@ static void _http_rcv_cmd(uint8_t* buf, uint16_t buflen)
 {
     uint8_t *puc_buf;
     uint8_t *puc_cmd;
-    uint16_t us_pib_id;
 
     puc_buf = buf;
 
