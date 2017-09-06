@@ -143,13 +143,13 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 
 	if (_app_id > SOCKET_MAX_NUM) {
 		LOG_SOCKET_DEBUG(("Socket: server socket() failed"));
-		exit(-1);
+		return(-1);
 	}
 
 	i_listen_sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (i_listen_sd < 0) {
 		LOG_SOCKET_DEBUG(("Socket: server socket() failed"));
-	    exit(-1);
+		return(-1);
 	}
 
 	/* Allow socket descriptor to be reuseable */
@@ -157,7 +157,7 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 	if (i_rc < 0) {
 		LOG_SOCKET_DEBUG(("Socket: setsockopt() failed"));
 	    close(i_listen_sd);
-	    exit(-1);
+	    return(-1);
 	}
 
 	/* Bind the socket */
@@ -169,7 +169,7 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 	if (i_rc < 0) {
 		LOG_SOCKET_DEBUG(("Socket: bind() failed"));
 		close(i_listen_sd);
-		exit(-1);
+		return(-1);
 	}
 
 	/* Set the listen back log */
@@ -177,7 +177,7 @@ socket_res_t socket_create_server(int _app_id, int _addr, int _port)
 	if (i_rc < 0) {
 		LOG_SOCKET_DEBUG(("Socket: listen() failed"));
 	    close(i_listen_sd);
-	    exit(-1);
+	    return(-1);
 	}
 
 	/* Add to socket list */

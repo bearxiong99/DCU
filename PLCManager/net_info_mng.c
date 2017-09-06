@@ -2,10 +2,14 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <sys/stat.h>
 
 #include "sys/time.h"
 
@@ -31,6 +35,12 @@ static x_coord_data_t sx_coord_data;
 /* Connection status */
 static uint16_t sus_num_devices;
 static x_dev_addr_t spx_current_addr_list[NUM_MAX_NODES];
+static char spuc_ppp_iface_file[] = "/sys/class/net/ppp0/statistics/rx_packets";
+//static char syscmd_ppp_down[] =  "killall pppd";
+//static char syscmd_ppp_up[] =  "pppd call g3 /dev/ttyS2 115200 &";
+
+static char syscmd_ppp_down[] =  "/etc/init.d/PLCpppUp stop";
+static char syscmd_ppp_up[] =  "/etc/init.d/PLCpppUp start";
 
 static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
@@ -78,11 +88,24 @@ static void _reset_plc(void)
 //    return ms;
 //}
 
+static void _ppp0_iface_down(void)
+{
+	system(syscmd_ppp_down);
+	sleep(2);
+}
+
+static void _ppp0_iface_up(void)
+{
+	system(syscmd_ppp_up);
+	sleep(5);
+}
+
+
 static void _reset_node_list(void)
 {
 	memset(spx_current_addr_list, 0, sizeof(spx_current_addr_list));
 	sus_num_devices = 0;
-	/* update reports for node list */
+	/* update reports for NULL node list */
 	net_info_report_devlist(spx_current_addr_list, sus_num_devices);
 }
 
@@ -175,6 +198,8 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 
 	case NET_INFO_ADP_NET_START_CFM:
 		_reset_node_list();
+		_ppp0_iface_down();
+		_ppp0_iface_up();
 		break;
 
 	case NET_INFO_ADP_JOIN_IND:
@@ -260,6 +285,8 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
  */
 void net_info_mng_process(void)
 {
+	struct stat dataFile;
+
 	if (sul_waiting_cdata_timer) {
 		sul_waiting_cdata_timer--;
 		return;
@@ -269,6 +296,13 @@ void net_info_mng_process(void)
 		/* Blocking timer */
 		sul_waiting_preq_timer--;
 		return;
+	}
+
+	/* Check PPP0 interface stats file*/
+	if (lstat (spuc_ppp_iface_file, &dataFile) == -1) {
+			printf ("ppp0 not exist\n");
+			/* It file doesn't exists, PPP0 iface should be restarted */
+			_ppp0_iface_up();
 	}
 
 	/* Check Validity of Coordinator Data */
@@ -293,10 +327,10 @@ void net_info_mng_init(int _app_id)
 	net_info_callbacks_t net_info_callbacks;
 	si_net_info_id = _app_id;
 
-	_reset_node_list();
-
+	_ppp0_iface_down();
 	_init_reset_plc();
 	_reset_plc();
+	_reset_node_list();
 
 	memset(&sx_coord_data, 0, sizeof(sx_coord_data));
 

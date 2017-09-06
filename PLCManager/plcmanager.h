@@ -28,9 +28,9 @@ enum {
 };
 
 enum {
-	PLC_MNG_SNIFFER_APP_PORT      = 9000,
-	PLC_MNG_NET_INFO_APP_PORT     = 9040,
-	PLC_MNG_HTTP_MNG_APP_PORT     = 9060
+	PLC_MNG_SNIFFER_APP_PORT      = 5000,
+	PLC_MNG_NET_INFO_APP_PORT     = 5040,
+	PLC_MNG_HTTP_MNG_APP_PORT     = 5060
 };
 
 typedef void (*pf_app_callback_t) (socket_ev_info_t *_ev_info);
