@@ -27,10 +27,12 @@
 #	define LOG_NET_INFO_DEBUG(a)   (void)0
 #endif
 
+
 static int si_net_info_id;
 
 /* Coordinator info */
 static x_coord_data_t sx_coord_data;
+static bool sb_net_start;
 
 /* Connection status */
 static uint16_t sus_num_devices;
@@ -182,6 +184,167 @@ static void _leave_node(uint16_t us_short_address)
 	}
 }
 
+static void _extract_network_config(uint8_t *puc_net_cfg)
+{
+	char puc_ln_buf[50];
+	int i_ln_len, i_size_fd;
+	int fd;
+	uint8_t *puc_ptr;
+	uint8_t uc_idx;
+
+	uc_idx = 0;
+
+	// G3 version
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/g3stackversion", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02u.%02u.%02u %02u-%02u-%02u", *puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2),
+						*(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 6;
+
+	// pan id
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/panid", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X", *puc_ptr, *(puc_ptr + 1));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 2;
+
+	// short addr
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/shortaddress", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X", *puc_ptr, *(puc_ptr + 1));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 2;
+
+	// extended addr
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/extendedaddress", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", *puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2),
+			*(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 8;
+
+	// PPP : MAC
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/pppmacdaddress", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X:%02X:%02X:%02X:%02X:%02X", *puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2),
+			*(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 6;
+
+	// PPP : LLA
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/ppplla", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// PPP : ULA
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/pppula", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// G3 PLC : LLA
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/plclla", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// G3 PLC : ULA
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/plcula", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// G3 PLC : Prefix
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/plcprefix", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// Routes : G3 PLC
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/routeplc", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// Routes : PPP
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/routeppp", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// SEC: PSK
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/secpsk", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// SEC: GMK
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/secgmk", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+			*puc_ptr, *(puc_ptr + 1), *(puc_ptr + 2), *(puc_ptr + 3), *(puc_ptr + 4), *(puc_ptr + 5), *(puc_ptr + 6), *(puc_ptr + 7),
+			*(puc_ptr + 8), *(puc_ptr + 9), *(puc_ptr + 10), *(puc_ptr + 11), *(puc_ptr + 12), *(puc_ptr + 13), *(puc_ptr + 14), *(puc_ptr + 15));
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx += 16;
+
+	// CONF_MAX_JOIN_WAIT_TIME
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/maxjoinwaittime", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%u", *puc_ptr);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx ++;
+
+	// CONF_MAX_HOPS
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/maxhops", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%u", *puc_ptr);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx ++;
+
+}
+
 static void _process_adp_event(uint8_t *puc_ev_data)
 {
 	uint8_t *puc_data_ptr;
@@ -200,6 +363,7 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 		_reset_node_list();
 		_ppp0_iface_down();
 		_ppp0_iface_up();
+		sb_net_start = true;
 		break;
 
 	case NET_INFO_ADP_JOIN_IND:
@@ -235,10 +399,7 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 
 
 	case NET_INFO_ADP_GET_CFM:
-		break;
-
-
-	case NET_INFO_ADP_MAC_GET_CFM:
+	{
 		/* Get attribute id */
 		puc_data_ptr++; /* uc_status */
 		ul_att_id = (uint32_t)(*puc_data_ptr++ << 24);
@@ -247,17 +408,42 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 		ul_att_id += (uint32_t)(*puc_data_ptr++);
 
 		/* Check Extended Address request */
-		if (ul_att_id == MAC_PIB_MANUF_EXTENDED_ADDRESS) {
+		if (ul_att_id == ADP_IB_MANUF_NET_CONFIG) {
 			puc_data_ptr += 3;
-			memcpy(sx_coord_data.puc_ext_addr, puc_data_ptr, 8);
+
+			/* Extract net config data */
+			_extract_network_config(puc_data_ptr);
 
 			/* Reset semaphore and flag to get data from coordinator */
 			sx_coord_data.b_is_valid = true;
 			sul_waiting_cdata_timer = 0;
 			sb_pending_cdata_cfm = false;
 		}
+	}
 		break;
 
+
+	case NET_INFO_ADP_MAC_GET_CFM:
+	{
+		/* Get attribute id */
+		puc_data_ptr++; /* uc_status */
+		ul_att_id = (uint32_t)(*puc_data_ptr++ << 24);
+		ul_att_id += (uint32_t)(*puc_data_ptr++ << 16);
+		ul_att_id += (uint32_t)(*puc_data_ptr++ << 8);
+		ul_att_id += (uint32_t)(*puc_data_ptr++);
+
+//		/* Check Extended Address request */
+//		if (ul_att_id == MAC_PIB_MANUF_EXTENDED_ADDRESS) {
+//			puc_data_ptr += 3;
+//			memcpy(sx_coord_data.puc_ext_addr, puc_data_ptr, 8);
+//
+//			/* Reset semaphore and flag to get data from coordinator */
+//			sx_coord_data.b_is_valid = true;
+//			sul_waiting_cdata_timer = 0;
+//			sb_pending_cdata_cfm = false;
+//		}
+	}
+		break;
 	}
 }
 
@@ -287,6 +473,10 @@ void net_info_mng_process(void)
 {
 	struct stat dataFile;
 
+	if (sb_net_start == false) {
+		return;
+	}
+
 	if (sul_waiting_cdata_timer) {
 		sul_waiting_cdata_timer--;
 		return;
@@ -308,7 +498,8 @@ void net_info_mng_process(void)
 	/* Check Validity of Coordinator Data */
 	if (sx_coord_data.b_is_valid == false) {
 		/* get coordinator extended address */
-		NetInfoAdpMacGetRequest(MAC_PIB_MANUF_EXTENDED_ADDRESS, 0);
+		//NetInfoAdpMacGetRequest(MAC_PIB_MANUF_EXTENDED_ADDRESS, 0);
+		NetInfoAdpGetRequest(ADP_IB_MANUF_NET_CONFIG, 0);
 		/* Blocking process to wait Coord Data Msg */
 		sul_waiting_cdata_timer = TIMER_TO_CDATA_INFO;
 		sb_pending_cdata_cfm = true;
@@ -326,6 +517,8 @@ void net_info_mng_init(int _app_id)
 {
 	net_info_callbacks_t net_info_callbacks;
 	si_net_info_id = _app_id;
+
+	sb_net_start = false;
 
 	_ppp0_iface_down();
 	_init_reset_plc();

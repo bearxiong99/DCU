@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 
 #include <sys/types.h>
@@ -35,6 +36,9 @@
 #include "usi_host.h"
 #include "hal_utils.h"
 
+#include <time.h>
+#include <sys/utsname.h>
+
 #define MAIN_DEBUG_CONSOLE
 
 #ifdef MAIN_DEBUG_CONSOLE
@@ -43,6 +47,8 @@
 #	define LOG_MAIN_DEBUG(a)   (void)0
 #endif
 
+static char app_name[] = "PLC Manager";
+static char app_version[] = "v1.0.0";
 
 typedef struct {
 	char sz_tty_name[255];
@@ -84,6 +90,59 @@ static int _parse_arguments(int argc, char** argv, x_serial_args_t *serial_args)
 	return 0;
 }
 
+static void _report_app_cfg(void)
+{
+	char puc_ln_buf[50];
+	int i_ln_len, i_size_fd;
+	int fd;
+	uint8_t *puc_ptr;
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	struct utsname unameData;
+
+	/* remove all files to update them */
+	system("rm /home/cfg/*");
+
+	// G3 version
+	fd = open("/home/cfg/appname", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, app_name);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+	fd = open("/home/cfg/appversion", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, app_version);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+	fd = open("/home/cfg/startuptime", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%d-%d-%d %d:%d:%d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec );
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+	uname(&unameData);
+	fd = open("/home/cfg/sysname", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, unameData.sysname);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	fd = open("/home/cfg/sysrelease", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, unameData.release);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	fd = open("/home/cfg/sysversion", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, unameData.version);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	fd = open("/home/cfg/sysmachine", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, unameData.machine);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	fd = open("/home/cfg/sysnodename", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, unameData.nodename);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+}
+
 int main(int argc, char** argv)
 {
 	socket_res_t i_socket_res;
@@ -98,6 +157,11 @@ int main(int argc, char** argv)
 		printf("\t-b baudrate           : tty baudrate configuration, default: 115200\n");
 		exit(-1);
 	}
+
+	_report_app_cfg();
+
+	system("killall pppd");
+	sleep(2);
 
 	/* Init callbacks for applications */
 	memset(&app_cbs, 0, sizeof(app_cbs));
