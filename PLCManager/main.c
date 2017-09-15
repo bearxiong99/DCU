@@ -35,6 +35,8 @@
 #include "sniffer.h"
 #include "usi_host.h"
 #include "hal_utils.h"
+#include "fu_mng.h"
+#include "tools.h"
 
 #include <time.h>
 #include <sys/utsname.h>
@@ -95,7 +97,6 @@ static void _report_app_cfg(void)
 	char puc_ln_buf[50];
 	int i_ln_len, i_size_fd;
 	int fd;
-	uint8_t *puc_ptr;
 	time_t t = time(NULL);
 	struct tm tm = *localtime(&t);
 	struct utsname unameData;
@@ -166,8 +167,11 @@ int main(int argc, char** argv)
 	/* Init callbacks for applications */
 	memset(&app_cbs, 0, sizeof(app_cbs));
 
-	/* init sockets */
+	/* Init sockets */
 	socket_init();
+
+	/* Init Tools module (Init GPIOs) */
+	tools_init();
 
 	/* Open SNIFFER server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_SNIFFER_APP_ID, INADDR_ANY, PLC_MNG_SNIFFER_APP_PORT);
@@ -215,6 +219,9 @@ int main(int argc, char** argv)
 	app_cbs[PLC_MNG_HTTP_MNG_APP_ID] = http_mng_callback;
 	/* Init HTTP client manager to connect with NODE server -> Send data to NetInfo */
 	http_mng_init();
+
+	/* Init Firmware Upgrade Manager */
+	fu_mng_init(PLC_MNG_FU_APP_ID);
 
 	while(1) {
 		int i_res;
