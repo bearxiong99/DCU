@@ -294,8 +294,8 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 
 	case NET_INFO_ADP_NET_START_CFM:
 		_reset_node_list();
-		tools_ppp0_down();
-		tools_ppp0_up();
+		tools_plc_down();
+		tools_plc_up();
 		sb_net_start = true;
 		break;
 
@@ -410,10 +410,10 @@ void net_info_mng_process(void)
 	}
 
 	/* Check PPP0 interface stats file*/
-	if (tools_ppp0_check() == -1) {
+	if (tools_plc_check() == -1) {
 			printf ("ppp0 not exist\n");
 			/* It file doesn't exists, PPP0 iface should be restarted */
-			tools_ppp0_up();
+			tools_plc_up();
 	}
 
 	/* Check Validity of Coordinator Data */
@@ -452,7 +452,7 @@ void net_info_mng_init(int _app_id)
 
 	sb_net_start = false;
 
-	tools_ppp0_down();
+	tools_plc_down();
 	tools_plc_reset();
 	_reset_node_list();
 
@@ -478,9 +478,23 @@ void net_info_webcmd_process(uint8_t* buf)
     switch (*puc_buf) {
     case WEBCMD_UPDATE_DEVLIST:
 		{
-			LOG_NET_INFO_DEBUG(("Net Info manager: update dash board info\n"));
-			//net_info_report_dashboard(&sx_net_info, &sx_net_statistics);
+			LOG_NET_INFO_DEBUG(("Net Info manager: update device list\n"));
 			http_mng_send_cmd(LNXCMD_REFRESH_DEVLIST, 0);
+		}
+    	break;
+
+    case WEBCMD_ENABLE_GPRS_MOD:
+		{
+			LOG_NET_INFO_DEBUG(("Net Info manager: enable GPRS module\n"));
+			tools_gprs_enable();
+			if (tools_gprs_detect()) {
+				tools_gprs_up();
+				if (tools_gprs_check()) {
+					http_mng_send_cmd(LNXCMD_GPRS_ON, 0);
+				} else {
+					http_mng_send_cmd(LNXCMD_GPRS_OFF, 0);
+				}
+			}
 		}
     	break;
     }

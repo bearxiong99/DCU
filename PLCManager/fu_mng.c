@@ -135,7 +135,7 @@ int fu_mng_start(void)
 
 	/* PPP interface down */
 	printf("PPP interface down\n");
-	tools_ppp0_down();
+	tools_plc_down();
 
 	/* Erase device */
 	printf("Erase device\n");

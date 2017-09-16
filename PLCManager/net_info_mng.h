@@ -21,11 +21,15 @@ typedef struct x_dev_addr {
 
 enum net_info_mng_webcmds {
 	WEBCMD_UPDATE_DEVLIST = 0x30,
+	WEBCMD_ENABLE_GPRS_MOD = 0x31,
+	WEBCMD_DISABLE_GPRS_MOD = 0x32,
 	WEBCMD_INVALD
 };
 
 enum net_info_mng_lnxcmds {
 	LNXCMD_REFRESH_DEVLIST = 0x40,
+	LNXCMD_GPRS_ON = 0x41,
+	LNXCMD_GPRS_OFF = 0x42,
 	LNXCMD_INVALD
 };
 

@@ -14,80 +14,179 @@
 #include "gpio.h"
 #include "tools.h"
 
-static char syscmd_ppp_down[] =  "/etc/init.d/PLCpppUp stop";
-static char syscmd_ppp_up[] =  "/etc/init.d/PLCpppUp start";
-static char spuc_ppp_iface_file[] = "/sys/class/net/ppp0/statistics/rx_packets";
+static char syscmd_plc_down[] =  "/etc/init.d/PLCpppUp stop";
+static char syscmd_plc_up[] =  "/etc/init.d/PLCpppUp start";
+static char spuc_plc_iface_file[] = "/sys/class/net/ppp0/statistics/rx_packets";
+
+static char syscmd_gprs_down[] =  "/etc/init.d/GPRSpppUp stop";
+static char syscmd_gprs_up[] =  "/etc/init.d/GPRSpppUp start";
+static char spuc_gprs_iface_file[] = "/sys/class/net/ppp1/statistics/rx_packets";
+
+static void _plc_init_pins(void)
+{
+	/* Configure PLC ERASE */
+	GPIOExport(PLC_ERASE_GPIO_ID);
+	GPIODirection(PLC_ERASE_GPIO_ID, GPIO_OUT);
+	GPIOWrite(PLC_ERASE_GPIO_ID, PLC_ERASE_GPIO_DISABLE);
+	usleep(500);
+
+	/* Configure PLC RESET */
+	GPIOExport(PLC_RESET_GPIO_ID);
+	GPIODirection(PLC_RESET_GPIO_ID, GPIO_OUT);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_DISABLE);
+	usleep(500);
+}
+
+static void _gprs_init_pins(void)
+{
+	/* Configure GPRS SUPPLY */
+	GPIOExport(GPRS_SUPPLY_GPIO_ID);
+	GPIODirection(GPRS_SUPPLY_GPIO_ID, GPIO_OUT);
+	GPIOWrite(GPRS_SUPPLY_GPIO_ID, GPRS_SUPPLY_GPIO_DISABLE);
+	usleep(500);
+
+	/* Configure GPRS DETECT */
+	GPIOExport(GPRS_DETECT_GPIO_ID);
+	GPIODirection(GPRS_DETECT_GPIO_ID, GPIO_IN);
+	GPIOWrite(GPRS_DETECT_GPIO_ID, GPRS_DETECT_GPIO_DISABLE);
+	usleep(500);
+
+	/* Configure GPRS PWRKEY */
+	GPIOExport(GPRS_PWRKEY_GPIO_ID);
+	GPIODirection(GPRS_PWRKEY_GPIO_ID, GPIO_OUT);
+	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_PWRKEY_GPIO_DISABLE);
+	usleep(500);
+}
 
 void tools_init(void)
 {
-	/* Configure ERASE pinout */
-	GPIOExport(ERASE_GPIO_ID);
-	GPIODirection(ERASE_GPIO_ID, GPIO_OUT);
-	GPIOWrite(ERASE_GPIO_ID, ERASE_GPIO_DISABLE);
-	usleep(500);
-	/* Configure RESET */
-	GPIOExport(RESET_GPIO_ID);
-	GPIODirection(RESET_GPIO_ID, GPIO_OUT);
+	/* Configure PLC pinout */
+	_plc_init_pins();
 
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
-	usleep(500);
+	/* Configure GPRS pinout */
+	_gprs_init_pins();
 }
 
 void tools_plc_reset(void)
 {
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_ENABLE);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_ENABLE);
 	usleep(500);
 
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_DISABLE);
 	usleep(5000);
 }
 
 void tools_plc_erase(void)
 {
 	/* Enable ERASE pin */
-	GPIOWrite(ERASE_GPIO_ID, ERASE_GPIO_ENABLE);
+	GPIOWrite(PLC_ERASE_GPIO_ID, PLC_ERASE_GPIO_ENABLE);
 	usleep(500);
 
 	/* Enable RESET pin */
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_ENABLE);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_ENABLE);
 	usleep(500);
 
 	/* Disable RESET pin */
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_DISABLE);
 	sleep(1);
 
 	/* Disable ERASE pin */
-	GPIOWrite(ERASE_GPIO_ID, ERASE_GPIO_DISABLE);
+	GPIOWrite(PLC_ERASE_GPIO_ID, PLC_ERASE_GPIO_DISABLE);
 	usleep(500);
 
 	/* Enable RESET pin */
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_ENABLE);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_ENABLE);
 	usleep(500);
 
 	/* Disable RESET pin */
-	GPIOWrite(RESET_GPIO_ID, RESET_GPIO_DISABLE);
+	GPIOWrite(PLC_RESET_GPIO_ID, PLC_RESET_GPIO_DISABLE);
 	sleep(1);
 
 }
 
-void tools_ppp0_down(void)
+void tools_plc_down(void)
 {
-	system(syscmd_ppp_down);
+	int res;
+
+	res = system(syscmd_plc_down);
+	printf("plc iface down res: %u\r\n", res);
 	sleep(2);
 }
 
-void tools_ppp0_up(void)
+void tools_plc_up(void)
 {
-	system(syscmd_ppp_up);
+	int res;
+
+	res = system(syscmd_plc_up);
+	printf("plc iface up res: %u\r\n", res);
 	sleep(5);
 }
 
-int tools_ppp0_check(void)
+int tools_plc_check(void)
 {
 	struct stat dataFile;
 
 	/* Check PPP0 interface stats file*/
-	if (lstat (spuc_ppp_iface_file, &dataFile) == -1) {
+	if (lstat (spuc_plc_iface_file, &dataFile) == -1) {
+			return -1;
+	}
+
+	return 0;
+}
+
+void tools_gprs_enable(void)
+{
+	/* Provide supply */
+	GPIOWrite(GPRS_SUPPLY_GPIO_ID, GPRS_SUPPLY_GPIO_ENABLE);
+	sleep(1);
+
+	/* Reset */
+	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_ENABLE);
+	sleep(1);
+	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_DISABLE);
+}
+
+void tools_gprs_reset(void)
+{
+	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_ENABLE);
+	sleep(1);
+	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_DISABLE);
+}
+
+bool tools_gprs_detect(void)
+{
+	/* Check GPRS detect pin */
+	if (GPIORead(GPRS_DETECT_GPIO_ID) == GPRS_DETECT_GPIO_ENABLE) {
+			return true;
+	}
+
+	return false;
+}
+
+void tools_gprs_down(void)
+{
+	int res;
+
+	res = system(syscmd_gprs_down);
+	printf("gprs iface down res: %u\r\n", res);
+	sleep(2);
+}
+
+void tools_gprs_up(void)
+{
+	int res;
+
+	res = system(syscmd_gprs_up);
+	printf("gprs iface up res: %u\r\n", res);
+	sleep(5);
+}
+
+int tools_gprs_check(void)
+{
+	struct stat dataFile;
+
+	/* Check PPP1 interface stats file*/
+	if (lstat (spuc_gprs_iface_file, &dataFile) == -1) {
 			return -1;
 	}
 
