@@ -80,7 +80,7 @@ static void _http_rcv_cmd(uint8_t* buf, uint16_t buflen)
     puc_cmd = (uint8_t *)strstr(puc_buf, "webcmd");
     if (puc_cmd) {
     	/* Filter only web commands */
-    	puc_cmd += 8;
+    	puc_cmd += 7;
 
     	/* Pass web cmd to net info */
     	net_info_webcmd_process(puc_cmd);

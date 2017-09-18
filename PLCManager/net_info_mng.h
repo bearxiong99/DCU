@@ -28,8 +28,8 @@ enum net_info_mng_webcmds {
 
 enum net_info_mng_lnxcmds {
 	LNXCMD_REFRESH_DEVLIST = 0x40,
-	LNXCMD_GPRS_ON = 0x41,
-	LNXCMD_GPRS_OFF = 0x42,
+	LNXCMD_REFRESH_GPRS = 0x41,
+	LNXCMD_REFRESH_SNIFFER = 0x42,
 	LNXCMD_INVALD
 };
 

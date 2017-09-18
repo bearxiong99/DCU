@@ -141,6 +141,14 @@ static void _report_app_cfg(void)
 	i_ln_len = sprintf(puc_ln_buf, unameData.nodename);
 	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
 	close(fd);
+	fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "0");
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	fd = open("/home/cfg/sniffer_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "1");
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
 
 }
 

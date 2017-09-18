@@ -485,16 +485,30 @@ void net_info_webcmd_process(uint8_t* buf)
 
     case WEBCMD_ENABLE_GPRS_MOD:
 		{
+			bool b_up;
+			char puc_ln_buf[50];
+			int i_ln_len, i_size_fd;
+			int fd;
+
 			LOG_NET_INFO_DEBUG(("Net Info manager: enable GPRS module\n"));
+			b_up = false;
 			tools_gprs_enable();
 			if (tools_gprs_detect()) {
 				tools_gprs_up();
 				if (tools_gprs_check()) {
-					http_mng_send_cmd(LNXCMD_GPRS_ON, 0);
-				} else {
-					http_mng_send_cmd(LNXCMD_GPRS_OFF, 0);
+					b_up = true;
 				}
 			}
+
+			fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+			if (b_up) {
+				i_ln_len = sprintf(puc_ln_buf, "1");
+			} else {
+				i_ln_len = sprintf(puc_ln_buf, "0");
+			}
+			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+			close(fd);
+			http_mng_send_cmd(LNXCMD_REFRESH_GPRS, 0);
 		}
     	break;
     }
