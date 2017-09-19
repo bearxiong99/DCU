@@ -146,6 +146,13 @@ void tools_gprs_enable(void)
 	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_DISABLE);
 }
 
+void tools_gprs_disable(void)
+{
+	/* Disable supply */
+	GPIOWrite(GPRS_SUPPLY_GPIO_ID, GPRS_SUPPLY_GPIO_DISABLE);
+	sleep(1);
+}
+
 void tools_gprs_reset(void)
 {
 	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_ENABLE);

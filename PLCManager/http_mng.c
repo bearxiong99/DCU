@@ -52,13 +52,10 @@ static uint16_t _build_post_query(uint8_t uc_cmd, void *pv_data)
 
 	(void)pv_data;
 
-	switch(uc_cmd) {
-	case LNXCMD_REFRESH_DEVLIST:
+	if (uc_cmd != LNXCMD_INVALD) {
 		sprintf(page, "[{%clnxcmd%c:%u}]", sc_com, sc_com, uc_cmd);
 		us_len = sprintf((char *)suc_http_tx_buf, tpl, HOST, PORT, strlen(page), page);
-		break;
-
-	default:
+	} else {
 		us_len = 0;
 	}
 

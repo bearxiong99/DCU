@@ -100,6 +100,32 @@ void NetInfoAdpMacGetRequest(uint32_t ul_att_id, uint16_t us_att_index)
     hal_usi_send_cmd(&sx_net_info_msg);
 }
 
+void NetInfoAdpMacSetRequest(uint32_t ul_att_id, uint16_t us_att_index, uint8_t uc_len, const uint8_t *puc_value)
+{
+    uint8_t *puc_msg;
+
+    /* Insert parameters */
+    puc_msg = spuc_serial_if_buf;
+
+    *puc_msg++ = NET_INFO_CMD_ADP_MAC_SET;
+    *puc_msg++ = (uint8_t)(ul_att_id >> 24);
+    *puc_msg++ = (uint8_t)(ul_att_id >> 16);
+    *puc_msg++ = (uint8_t)(ul_att_id >> 8);
+    *puc_msg++ = (uint8_t)ul_att_id;
+    *puc_msg++ = (uint8_t)(us_att_index >> 8);
+    *puc_msg++ = (uint8_t)us_att_index;
+    *puc_msg++ = uc_len;
+    if (uc_len) {
+    	memcpy(puc_msg, puc_value, uc_len);
+    	puc_msg += uc_len;
+    }
+
+    /* Send to USI */
+    sx_net_info_msg.us_len = puc_msg - spuc_serial_if_buf;
+
+    hal_usi_send_cmd(&sx_net_info_msg);
+}
+
 void NetInfoAdpGetRequest(uint32_t ul_att_id, uint16_t us_att_index)
 {
     uint8_t *puc_msg;

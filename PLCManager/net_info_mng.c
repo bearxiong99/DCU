@@ -32,6 +32,7 @@ static int si_net_info_id;
 static x_coord_data_t sx_coord_data;
 static bool sb_net_start;
 static bool sb_fu_start;
+static uint8_t suc_webcmd_pending;
 
 /* Connection status */
 static uint16_t sus_num_devices;
@@ -276,6 +277,25 @@ static void _extract_network_config(uint8_t *puc_net_cfg)
 	close(fd);
 	uc_idx ++;
 
+	// PLC SNIFFER
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/sniffer_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%u", *puc_ptr);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+	uc_idx ++;
+
+	// GPRS
+	puc_ptr = &puc_net_cfg[uc_idx];
+	fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	if (tools_gprs_check() == 0) {
+		*puc_ptr = 1;
+	} else {
+		*puc_ptr = 0;
+	}
+	i_ln_len = sprintf(puc_ln_buf, "%u", *puc_ptr);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
 }
 
 static void _process_adp_event(uint8_t *puc_ev_data)
@@ -438,6 +458,12 @@ void net_info_mng_process(void)
 		sb_fu_start = false;
 	}
 
+	/* Check Web Command pending */
+	if (suc_webcmd_pending != WEBCMD_INVALD) {
+		http_mng_send_cmd(suc_webcmd_pending, 0);
+		suc_webcmd_pending = WEBCMD_INVALD;
+	}
+
 }
 
 /*
@@ -465,6 +491,8 @@ void net_info_mng_init(int _app_id)
 	sb_pending_cdata_cfm = false;
 	sul_waiting_cdata_timer = 0;
 	sul_waiting_preq_timer = 0;
+
+	suc_webcmd_pending = WEBCMD_INVALD;
 }
 
 /**
@@ -508,7 +536,67 @@ void net_info_webcmd_process(uint8_t* buf)
 			}
 			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
 			close(fd);
-			http_mng_send_cmd(LNXCMD_REFRESH_GPRS, 0);
+
+			suc_webcmd_pending = LNXCMD_REFRESH_GPRS;
+		}
+    	break;
+
+    case WEBCMD_DISABLE_GPRS_MOD:
+		{
+			char puc_ln_buf[50];
+			int i_ln_len, i_size_fd;
+			int fd;
+
+			LOG_NET_INFO_DEBUG(("Net Info manager: disable GPRS module\n"));
+			tools_gprs_down();
+			tools_gprs_disable();
+
+			i_ln_len = sprintf(puc_ln_buf, "0");
+			fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+			close(fd);
+
+			suc_webcmd_pending = LNXCMD_REFRESH_GPRS;
+		}
+    	break;
+
+    case WEBCMD_ENABLE_SNIFFER_MOD:
+		{
+			uint8_t uc_sniffer_enable;
+			char puc_ln_buf[50];
+			int i_ln_len, i_size_fd;
+			int fd;
+
+			LOG_NET_INFO_DEBUG(("Net Info manager: enable PLC SNIFFER\n"));
+			uc_sniffer_enable = 1;
+			NetInfoAdpMacSetRequest(MAC_PIB_MANUF_ENABLE_MAC_SNIFFER, 0, 1, &uc_sniffer_enable);
+
+			i_ln_len = sprintf(puc_ln_buf, "1");
+			fd = open("/home/cfg/sniffer_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+			close(fd);
+
+			suc_webcmd_pending = LNXCMD_REFRESH_SNIFFER;
+		}
+    	break;
+
+    case WEBCMD_DISABLE_SNIFFER_MOD:
+		{
+			uint8_t uc_sniffer_enable;
+			char puc_ln_buf[50];
+			int i_ln_len, i_size_fd;
+			int fd;
+
+			LOG_NET_INFO_DEBUG(("Net Info manager: disable PLC SNIFFER\n"));
+			uc_sniffer_enable = 0;
+			NetInfoAdpMacSetRequest(MAC_PIB_MANUF_ENABLE_MAC_SNIFFER, 0, 1, &uc_sniffer_enable);
+
+			i_ln_len = sprintf(puc_ln_buf, "0");
+			fd = open("/home/cfg/sniffer_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+			close(fd);
+
+			suc_webcmd_pending = LNXCMD_REFRESH_SNIFFER;
 		}
     	break;
     }

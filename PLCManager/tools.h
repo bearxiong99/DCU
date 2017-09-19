@@ -36,6 +36,7 @@ void tools_plc_up(void);
 int tools_plc_check(void);
 
 void tools_gprs_enable(void);
+void tools_gprs_disable(void);
 void tools_gprs_reset(void);
 bool tools_gprs_detect(void);
 void tools_gprs_down(void);
