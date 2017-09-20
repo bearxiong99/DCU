@@ -170,6 +170,7 @@ int main(int argc, char** argv)
 	_report_app_cfg();
 
 	system("killall pppd");
+	system("killall chat");
 	sleep(2);
 
 	/* Init callbacks for applications */

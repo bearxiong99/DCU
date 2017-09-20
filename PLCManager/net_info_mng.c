@@ -50,6 +50,9 @@ static uint32_t sul_waiting_preq_timer;
 #define TIMER_TO_REQ_PATH_INFO    500 // 5 seconds
 
 
+#define TIMER_TO_RESET            6000 // 60 seconds
+static uint32_t sul_waiting_reset_timer;
+
 static void _reset_node_list(void)
 {
 	memset(spx_current_addr_list, 0, sizeof(spx_current_addr_list));
@@ -429,8 +432,23 @@ void net_info_mng_process(void)
 		return;
 	}
 
+	if (!sul_waiting_reset_timer--) {
+		/* Blocking timer */
+		sul_waiting_reset_timer = TIMER_TO_RESET;
+
+		sb_net_start = false;
+		tools_plc_down();
+		tools_plc_reset();
+		_reset_node_list();
+
+		return;
+	}
+
 	/* Check PPP0 interface stats file*/
 	if (tools_plc_check() == -1) {
+			system("killall pppd");
+			system("killall chat");
+			sleep(2);
 			printf ("ppp0 not exist\n");
 			/* It file doesn't exists, PPP0 iface should be restarted */
 			tools_plc_up();
@@ -491,6 +509,8 @@ void net_info_mng_init(int _app_id)
 	sb_pending_cdata_cfm = false;
 	sul_waiting_cdata_timer = 0;
 	sul_waiting_preq_timer = 0;
+
+	sul_waiting_reset_timer = TIMER_TO_RESET;
 
 	suc_webcmd_pending = WEBCMD_INVALD;
 }
