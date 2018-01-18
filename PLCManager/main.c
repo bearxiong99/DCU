@@ -171,6 +171,7 @@ int main(int argc, char** argv)
 
 	system("killall pppd");
 	system("killall chat");
+	system("killall node");
 	sleep(2);
 
 	/* Init callbacks for applications */

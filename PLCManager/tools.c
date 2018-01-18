@@ -22,6 +22,8 @@ static char syscmd_gprs_down[] =  "/etc/init.d/GPRSpppUp stop";
 static char syscmd_gprs_up[] =  "/etc/init.d/GPRSpppUp start";
 static char spuc_gprs_iface_file[] = "/sys/class/net/ppp1/statistics/rx_packets";
 
+static char spuc_fu_start_file[] =  "/home/cfg/fu_en";
+
 static void _plc_init_pins(void)
 {
 	/* Configure PLC ERASE */
@@ -222,4 +224,16 @@ int tools_get_timestamp_ms(void)
     ms = te.tv_sec*1000 + te.tv_usec/1000;
 
     return ms;
+}
+
+int tools_fu_start_check(void)
+{
+	struct stat dataFile;
+
+	/* Check FU start cfg file*/
+	if (lstat (spuc_fu_start_file, &dataFile) == -1) {
+			return -1;
+	}
+
+	return 0;
 }
