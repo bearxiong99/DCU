@@ -46,4 +46,6 @@ int tools_gprs_check(void);
 uint16_t tools_extract_u16(void *vptr_value);
 int tools_get_timestamp_ms(void);
 
+int tools_fu_start_check(char *pc_fu_filename);
+
 #endif /* TOOLS_H_INCLUDED */

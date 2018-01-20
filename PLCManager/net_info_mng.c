@@ -28,15 +28,15 @@
 
 static int si_net_info_id;
 
-/* Coordinator info */
-static x_coord_data_t sx_coord_data;
+/* gateway info */
+static x_gw_data_t sx_gw_data;
 static bool sb_net_start;
-static bool sb_fu_start;
 static uint8_t suc_webcmd_pending;
 
 /* Connection status */
 static uint16_t sus_num_devices;
 static x_dev_addr_t spx_current_addr_list[NUM_MAX_NODES];
+static char spc_fu_filename[200];
 
 static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
@@ -48,10 +48,6 @@ static uint32_t sul_waiting_preq_timer;
 /* Timers based on 10 ms */
 #define TIMER_TO_CDATA_INFO       500 // 5 seconds
 #define TIMER_TO_REQ_PATH_INFO    500 // 5 seconds
-
-
-#define TIMER_TO_RESET            6000 // 60 seconds
-static uint32_t sul_waiting_reset_timer;
 
 static void _reset_node_list(void)
 {
@@ -370,8 +366,8 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 			/* Extract net config data */
 			_extract_network_config(puc_data_ptr);
 
-			/* Reset semaphore and flag to get data from coordinator */
-			sx_coord_data.b_is_valid = true;
+			/* Reset semaphore and flag to get data from gateway */
+			sx_gw_data.b_is_valid = true;
 			sul_waiting_cdata_timer = 0;
 			sb_pending_cdata_cfm = false;
 		}
@@ -432,19 +428,7 @@ void net_info_mng_process(void)
 		return;
 	}
 
-	if (!sul_waiting_reset_timer--) {
-		/* Blocking timer */
-		sul_waiting_reset_timer = TIMER_TO_RESET;
-
-		sb_net_start = false;
-		tools_plc_down();
-		tools_plc_reset();
-		_reset_node_list();
-
-		return;
-	}
-
-	/* Check PPP0 interface stats file*/
+	/* Check PPP0 interface is enable */
 	if (tools_plc_check() == -1) {
 			system("killall pppd");
 			system("killall chat");
@@ -454,32 +438,30 @@ void net_info_mng_process(void)
 			tools_plc_up();
 	}
 
-	/* Check Validity of Coordinator Data */
-	if (sx_coord_data.b_is_valid == false) {
-		/* get coordinator extended address */
-		//NetInfoAdpMacGetRequest(MAC_PIB_MANUF_EXTENDED_ADDRESS, 0);
+	/* Check Validity of gateway Data */
+	if (sx_gw_data.b_is_valid == false) {
+		/* get gateway extended address */
 		NetInfoAdpGetRequest(ADP_IB_MANUF_NET_CONFIG, 0);
-		/* Blocking process to wait Coord Data Msg */
+		/* Blocking process to wait gw Data Msg */
 		sul_waiting_cdata_timer = TIMER_TO_CDATA_INFO;
 		sb_pending_cdata_cfm = true;
 		return;
-	}
-
-	/* Check FU start flag */
-	if (sb_fu_start) {
-		if (fu_mng_start() == -1) {
-			fprintf(stderr, "FUP ERROR\n");
-		}
-		/* Update coordinator info */
-		sx_coord_data.b_is_valid == false;
-		/* reset flag */
-		sb_fu_start = false;
 	}
 
 	/* Check Web Command pending */
 	if (suc_webcmd_pending != WEBCMD_INVALD) {
 		http_mng_send_cmd(suc_webcmd_pending, 0);
 		suc_webcmd_pending = WEBCMD_INVALD;
+	}
+
+	/* Check FU start file */
+	if (tools_fu_start_check(spc_fu_filename)) {
+		if (fu_mng_start(spc_fu_filename) == -1) {
+			fprintf(stderr, "FUP ERROR\n");
+		}
+
+		/* Restart PLC gateway: Update gateway info */
+		sx_gw_data.b_is_valid = false;
 	}
 
 }
@@ -500,7 +482,7 @@ void net_info_mng_init(int _app_id)
 	tools_plc_reset();
 	_reset_node_list();
 
-	memset(&sx_coord_data, 0, sizeof(sx_coord_data));
+	memset(&sx_gw_data, 0, sizeof(sx_gw_data));
 
 	net_info_callbacks.event_indication = NetInfoEventIndication;
 	NetInfoSetCallbacks(&net_info_callbacks);
@@ -509,8 +491,6 @@ void net_info_mng_init(int _app_id)
 	sb_pending_cdata_cfm = false;
 	sul_waiting_cdata_timer = 0;
 	sul_waiting_preq_timer = 0;
-
-	sul_waiting_reset_timer = TIMER_TO_RESET;
 
 	suc_webcmd_pending = WEBCMD_INVALD;
 }

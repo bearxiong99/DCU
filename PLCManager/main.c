@@ -167,6 +167,8 @@ int main(int argc, char** argv)
 		exit(-1);
 	}
 
+	printf("PLCManager starting...\r\n");
+
 	_report_app_cfg();
 
 	system("killall pppd");

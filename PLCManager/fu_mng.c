@@ -30,8 +30,6 @@ static int si_fu_mng_id;
 #define BUFFER_WRITE         8192
 #define BUFFER_READ          128
 
-static const char spuc_filename[] = "/home/fup/gateway.bin";
-
 static bool get_file_size(const char* filename, uint32_t* size)
 {
 	struct stat st;
@@ -127,7 +125,7 @@ void fu_mng_init(int _app_id)
 }
 
 
-int fu_mng_start(void)
+int fu_mng_start(char *pc_fu_filename)
 {
 	int fd = -1;
 	char* port = "/dev/ttyS2";
@@ -158,7 +156,7 @@ int fu_mng_start(void)
 	printf("Device: Atmel %s\n", chip->name);
 
 	/* Get FU file (read mode) */
-	if (!get_file_size(spuc_filename, &filesize)) {
+	if (!get_file_size(pc_fu_filename, &filesize)) {
 		fprintf(stderr, "FU file not found\n");
 		return -1;
 	}
@@ -178,8 +176,8 @@ int fu_mng_start(void)
 	}
 
 	/* Write FU file in flash */
-	printf("Writing %d bytes at 0x%08x from file '%s'\n", filesize, chip->flash_addr, spuc_filename);
-	if (!write_flash(fd, chip, spuc_filename, 0, filesize)) {
+	printf("Writing %d bytes at 0x%08x from file '%s'\n", filesize, chip->flash_addr, pc_fu_filename);
+	if (!write_flash(fd, chip, pc_fu_filename, 0, filesize)) {
 		fprintf(stderr, "Could not write file in flash memory\n");
 		return -1;
 	}

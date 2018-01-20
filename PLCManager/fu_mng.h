@@ -7,7 +7,7 @@
 //#define FU_MNF_DEBUG_CONSOLE
 
 void fu_mng_init(int _app_id);
-int fu_mng_start(void);
+int fu_mng_start(char *pc_fu_filename);
 void fu_mng_process(void);
 
 #endif /* FU_MNG_H_INCLUDED */

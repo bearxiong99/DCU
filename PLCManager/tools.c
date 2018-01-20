@@ -22,7 +22,7 @@ static char syscmd_gprs_down[] =  "/etc/init.d/GPRSpppUp stop";
 static char syscmd_gprs_up[] =  "/etc/init.d/GPRSpppUp start";
 static char spuc_gprs_iface_file[] = "/sys/class/net/ppp1/statistics/rx_packets";
 
-static char spuc_fu_start_file[] =  "/home/cfg/fu_en";
+static const char spuc_fu_start_cmd[] =  "/home/cfg/fu_en";
 
 static void _plc_init_pins(void)
 {
@@ -226,14 +226,22 @@ int tools_get_timestamp_ms(void)
     return ms;
 }
 
-int tools_fu_start_check(void)
+int tools_fu_start_check(char *pc_fu_filename)
 {
 	struct stat dataFile;
+	int i_size_fd;
+	int fd;
 
-	/* Check FU start cfg file*/
-	if (lstat (spuc_fu_start_file, &dataFile) == -1) {
-			return -1;
+	/* Check if FU start cmd file exists */
+	if (lstat (spuc_fu_start_cmd, &dataFile) == -1) {
+			return 0;
 	}
 
-	return 0;
+	/* Extract the name of file to use in firmware upgrade process */
+	fd = open(spuc_fu_start_cmd, O_RDWR, S_IROTH);
+	i_size_fd = read(fd, pc_fu_filename, 200);
+	close(fd);
+	remove(pc_fu_filename);
+
+	return i_size_fd;
 }

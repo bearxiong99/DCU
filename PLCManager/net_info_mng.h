@@ -9,10 +9,10 @@
 
 #define MAX_NET_INFO_SOCKET_SIZE      1000
 
-typedef struct x_coord_data {
+typedef struct x_gw_data {
 	bool b_is_valid;
 	uint8_t puc_ext_addr[8];
-} x_coord_data_t;
+} x_gw_data_t;
 
 typedef struct x_dev_addr {
 	uint16_t us_short_addr;
