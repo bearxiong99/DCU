@@ -430,6 +430,7 @@ void net_info_mng_process(void)
 
 	/* Check PPP0 interface is enable */
 	if (tools_plc_check() == -1) {
+			tools_plc_reset();
 			system("killall pppd");
 			system("killall chat");
 			sleep(2);
@@ -448,7 +449,7 @@ void net_info_mng_process(void)
 		return;
 	}
 
-	/* Check Web Command pending */
+	/* Check Web Command pending to send Command to Node JS */
 	if (suc_webcmd_pending != WEBCMD_INVALD) {
 		http_mng_send_cmd(suc_webcmd_pending, 0);
 		suc_webcmd_pending = WEBCMD_INVALD;

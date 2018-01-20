@@ -237,11 +237,15 @@ int tools_fu_start_check(char *pc_fu_filename)
 			return 0;
 	}
 
+	sleep(1);
+
+	memset(pc_fu_filename, 0, 200);
+
 	/* Extract the name of file to use in firmware upgrade process */
 	fd = open(spuc_fu_start_cmd, O_RDWR, S_IROTH);
 	i_size_fd = read(fd, pc_fu_filename, 200);
 	close(fd);
-	remove(pc_fu_filename);
+	remove(spuc_fu_start_cmd);
 
 	return i_size_fd;
 }

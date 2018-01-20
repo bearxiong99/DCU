@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 
 #include "fu_mng.h"
+#include "http_mng.h"
+#include "net_info_mng.h"
 #include "tools.h"
 
 #include "chipid.h"
@@ -45,6 +47,10 @@ static bool get_file_size(const char* filename, uint32_t* size)
 
 static bool write_flash(int fd, const struct _chip* chip, const char* filename, uint32_t addr, uint32_t size)
 {
+	char puc_ln_buf[50];
+	int i_ln_len, i_size_fd;
+	int fdfu;
+
 	FILE* file = fopen(filename, "rb");
 	if (!file) {
 		fprintf(stderr, "Could not open '%s' for reading\n", filename);
@@ -69,6 +75,13 @@ static bool write_flash(int fd, const struct _chip* chip, const char* filename, 
 		total += count;
 		addr += count;
 		fprintf(stderr, "Wrote '%d' bytes\n", total);
+
+		/* Report to webserver */
+		fdfu = open("/home/cfg/fu_st", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+		i_ln_len = sprintf(puc_ln_buf, "%03u", (total * 100) / size);
+		i_size_fd = write(fdfu, puc_ln_buf, i_ln_len);
+		close(fdfu);
+		http_mng_send_cmd(LNXCMD_REFRESH_FU, 0);
 	}
 
 	fclose(file);
@@ -131,6 +144,12 @@ int fu_mng_start(char *pc_fu_filename)
 	char* port = "/dev/ttyS2";
 	uint32_t filesize = 0;
 
+	/* Get FU file (read mode) */
+	if (!get_file_size(pc_fu_filename, &filesize)) {
+		fprintf(stderr, "FU file not found\n");
+		return -1;
+	}
+
 	/* PPP interface down */
 	printf("PPP interface down\n");
 	tools_plc_down();
@@ -154,12 +173,6 @@ int fu_mng_start(char *pc_fu_filename)
 		return -1;
 	}
 	printf("Device: Atmel %s\n", chip->name);
-
-	/* Get FU file (read mode) */
-	if (!get_file_size(pc_fu_filename, &filesize)) {
-		fprintf(stderr, "FU file not found\n");
-		return -1;
-	}
 
 	/* Unlock Flash mem */
 	struct _eefc_locks locks;
@@ -199,6 +212,9 @@ int fu_mng_start(char *pc_fu_filename)
 	/* Reset device */
 	printf("Reset device\n");
 	tools_plc_reset();
+
+	/* Close samba */
+	samba_close(fd);
 
 	/* Success */
 	printf("Firmware Upgrade process success\n");
