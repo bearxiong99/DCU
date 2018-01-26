@@ -33,8 +33,8 @@
 #include "net_info_mng.h"
 #include "http_mng.h"
 #include "sniffer.h"
-#include "usi_host.h"
-#include "hal_utils.h"
+#include "usi_host/usi_host.h"
+#include "usi_host/hal_utils.h"
 #include "fu_mng.h"
 #include "tools.h"
 

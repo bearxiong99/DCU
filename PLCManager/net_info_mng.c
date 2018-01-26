@@ -9,10 +9,13 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <netdb.h>
 
 #include "config.h"
 #include "socket_handler.h"
-#include "ifaceNet_api.h"
+#include "usi_host/ifaceNet_api.h"
 #include "net_info_mng.h"
 #include "net_info_report.h"
 #include "http_mng.h"
@@ -25,13 +28,18 @@
 #	define LOG_NET_INFO_DEBUG(a)   (void)0
 #endif
 
-
 static int si_net_info_id;
 
 /* gateway info */
 static x_gw_data_t sx_gw_data;
 static bool sb_net_start;
 static uint8_t suc_webcmd_pending;
+
+/* Define 3 linux interfaces: eth0, ppp0, zt0 */
+#define ETH0    0
+#define PPP0    1
+#define ZT0     2
+static x_if_addr_t sx_ifaces[3];
 
 /* Connection status */
 static uint16_t sus_num_devices;
@@ -40,10 +48,10 @@ static char spc_fu_filename[200];
 
 static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
+static bool sb_pending_ifaces_cfg;
 
 /* Waiting Process timer */
-static uint32_t sul_waiting_cdata_timer;
-static uint32_t sul_waiting_preq_timer;
+static uint32_t sul_waiting_gw_data_timer;
 
 /* Timers based on 10 ms */
 #define TIMER_TO_CDATA_INFO       500 // 5 seconds
@@ -368,7 +376,7 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 
 			/* Reset semaphore and flag to get data from gateway */
 			sx_gw_data.b_is_valid = true;
-			sul_waiting_cdata_timer = 0;
+			sul_waiting_gw_data_timer = 0;
 			sb_pending_cdata_cfm = false;
 		}
 	}
@@ -405,6 +413,89 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
 
 }
 
+static void _get_ifaces_cfg(void)
+{
+	struct ifaddrs *ifaddr, *ifa;
+	uint8_t uc_if_idx;
+	int family, s, n;
+	char host[50];
+
+	/* Check Validity of gateway Data */
+	if (getifaddrs(&ifaddr) == -1) {
+		printf ("if address error\n");
+	}
+
+	/* Walk through linked list, maintaining head pointer so we
+	              can free list later */
+	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+	   if (ifa->ifa_addr == NULL)
+		   continue;
+
+	   family = ifa->ifa_addr->sa_family;
+
+	   if (family == AF_INET || family == AF_INET6) {
+		   if (memcmp("eth0", ifa->ifa_name, 4) == 0) {
+			   uc_if_idx = ETH0;
+		   } else if (memcmp("ppp0", ifa->ifa_name, 4) == 0) {
+			   uc_if_idx = PPP0;
+		   } else if (memcmp("zt0", ifa->ifa_name, 3) == 0) {
+			   uc_if_idx = ZT0;
+		   } else {
+			   continue;
+		   }
+
+		   s = getnameinfo(ifa->ifa_addr,
+		   				   (family == AF_INET) ? sizeof(struct sockaddr_in) :
+		   										 sizeof(struct sockaddr_in6),
+		   				   host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+		   if (family == AF_INET) {
+			   /* IPV4 */
+			   sprintf(sx_ifaces[uc_if_idx].af_inet, "%s", host);
+		   } else {
+			   if ((host[1] == 0x65) && (host[2] == 0x38)) {
+				   /* LLA */
+				   sprintf(sx_ifaces[uc_if_idx].af_inet6_1, "%s", host);
+			   } else {
+				   /* ULA */
+				   sprintf(sx_ifaces[uc_if_idx].af_inet6_2, "%s", host);
+			   }
+		   }
+	   }
+	}
+
+	freeifaddrs(ifaddr);
+}
+
+static void _report_ifaces_cfg(void)
+{
+	char puc_ln_buf[150];
+	int i_ln_len, i_size_fd;
+	int fd;
+
+	// ETH0
+	fd = open("/home/cfg/eth0", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%s;%s;%s;", sx_ifaces[ETH0].af_inet,
+			sx_ifaces[ETH0].af_inet6_1, sx_ifaces[ETH0].af_inet6_2);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+	// PPP0
+	fd = open("/home/cfg/ppp0", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%s;%s;%s;", sx_ifaces[PPP0].af_inet,
+			sx_ifaces[PPP0].af_inet6_1, sx_ifaces[PPP0].af_inet6_2);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+	// ZT0
+	fd = open("/home/cfg/zt0", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+	i_ln_len = sprintf(puc_ln_buf, "%s;%s;%s;", sx_ifaces[ZT0].af_inet,
+			sx_ifaces[ZT0].af_inet6_1, sx_ifaces[ZT0].af_inet6_2);
+	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+	close(fd);
+
+}
+
 /**
  * \brief Periodic task to process Cycles App. Initialize and start Cycles Application and launch timer
  * to update internal counters.
@@ -412,19 +503,12 @@ static void NetInfoEventIndication(net_info_event_ind_t *px_event_info)
  */
 void net_info_mng_process(void)
 {
-
 	if (sb_net_start == false) {
 		return;
 	}
 
-	if (sul_waiting_cdata_timer) {
-		sul_waiting_cdata_timer--;
-		return;
-	}
-
-	if (sul_waiting_preq_timer) {
-		/* Blocking timer */
-		sul_waiting_preq_timer--;
+	if (sul_waiting_gw_data_timer) {
+		sul_waiting_gw_data_timer--;
 		return;
 	}
 
@@ -444,9 +528,16 @@ void net_info_mng_process(void)
 		/* get gateway extended address */
 		NetInfoAdpGetRequest(ADP_IB_MANUF_NET_CONFIG, 0);
 		/* Blocking process to wait gw Data Msg */
-		sul_waiting_cdata_timer = TIMER_TO_CDATA_INFO;
+		sul_waiting_gw_data_timer = TIMER_TO_CDATA_INFO;
 		sb_pending_cdata_cfm = true;
 		return;
+	}
+
+	/* Get IF configuration */
+	if (sb_pending_ifaces_cfg) {
+		_get_ifaces_cfg();
+		_report_ifaces_cfg();
+		sb_pending_ifaces_cfg = false;
 	}
 
 	/* Check Web Command pending to send Command to Node JS */
@@ -490,8 +581,8 @@ void net_info_mng_init(int _app_id)
 
 	sb_pending_preq_cfm = false;
 	sb_pending_cdata_cfm = false;
-	sul_waiting_cdata_timer = 0;
-	sul_waiting_preq_timer = 0;
+	sb_pending_ifaces_cfg = true;
+	sul_waiting_gw_data_timer = 0;
 
 	suc_webcmd_pending = WEBCMD_INVALD;
 }

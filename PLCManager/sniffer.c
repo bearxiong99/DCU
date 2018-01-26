@@ -7,8 +7,8 @@
 
 #include "socket_handler.h"
 #include "sniffer.h"
-#include "usi_host.h"
-#include "hal_utils.h"
+#include "usi_host/usi_host.h"
+#include "usi_host/hal_utils.h"
 
 #ifdef SNIFFER_DEBUG_CONSOLE
 #	define LOG_SNIFFER_DEBUG(a)   printf a

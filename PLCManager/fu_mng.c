@@ -16,10 +16,10 @@
 #include "net_info_mng.h"
 #include "tools.h"
 
-#include "chipid.h"
-#include "comm.h"
-#include "utils.h"
-#include "eefc.h"
+#include "USAMBA/chipid.h"
+#include "USAMBA/comm.h"
+#include "USAMBA/utils.h"
+#include "USAMBA/eefc.h"
 
 #ifdef FU_MNF_DEBUG_CONSOLE
 #	define FU_INFO_DEBUG(a)   printf a

@@ -19,6 +19,12 @@ typedef struct x_dev_addr {
 	uint8_t puc_ext_addr[8];
 } x_dev_addr_t;
 
+typedef struct x_if_addr {
+	char af_inet[50];     /* ipv4 */
+	char af_inet6_1[50];  /* ipv6 LLA */
+	char af_inet6_2[50];  /* ipv6 ULA */
+} x_if_addr_t;
+
 enum net_info_mng_webcmds {
 	WEBCMD_UPDATE_DEVLIST = 0x30,
 	WEBCMD_ENABLE_GPRS_MOD = 0x31,
