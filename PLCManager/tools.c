@@ -245,7 +245,13 @@ int tools_fu_start_check(char *pc_fu_filename)
 	fd = open(spuc_fu_start_cmd, O_RDWR, S_IROTH);
 	i_size_fd = read(fd, pc_fu_filename, 200);
 	close(fd);
-	remove(spuc_fu_start_cmd);
 
+	/* Check if FU bin file exists */
+	if (lstat (pc_fu_filename, &dataFile) == -1) {
+		/* return error */
+		i_size_fd = 0;
+	}
+
+	remove(spuc_fu_start_cmd);
 	return i_size_fd;
 }

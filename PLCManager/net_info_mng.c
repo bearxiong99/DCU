@@ -503,6 +503,16 @@ static void _report_ifaces_cfg(void)
  */
 void net_info_mng_process(void)
 {
+	/* Check FU start file */
+	if (tools_fu_start_check(spc_fu_filename)) {
+		if (fu_mng_start(spc_fu_filename) == -1) {
+			fprintf(stderr, "FUP ERROR\n");
+		}
+
+		/* Restart PLC gateway: Update gateway info */
+		sx_gw_data.b_is_valid = false;
+	}
+
 	if (sb_net_start == false) {
 		return;
 	}
@@ -544,16 +554,6 @@ void net_info_mng_process(void)
 	if (suc_webcmd_pending != WEBCMD_INVALD) {
 		http_mng_send_cmd(suc_webcmd_pending, 0);
 		suc_webcmd_pending = WEBCMD_INVALD;
-	}
-
-	/* Check FU start file */
-	if (tools_fu_start_check(spc_fu_filename)) {
-		if (fu_mng_start(spc_fu_filename) == -1) {
-			fprintf(stderr, "FUP ERROR\n");
-		}
-
-		/* Restart PLC gateway: Update gateway info */
-		sx_gw_data.b_is_valid = false;
 	}
 
 }
