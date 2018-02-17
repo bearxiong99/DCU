@@ -141,10 +141,17 @@ static void _report_app_cfg(void)
 	i_ln_len = sprintf(puc_ln_buf, unameData.nodename);
 	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
 	close(fd);
+
+	/* detect if GPRS is enable */
 	fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
-	i_ln_len = sprintf(puc_ln_buf, "0");
+	if (tools_gprs_check()) {
+		i_ln_len = sprintf(puc_ln_buf, "1");
+	} else {
+		i_ln_len = sprintf(puc_ln_buf, "0");
+	}
 	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
 	close(fd);
+
 	fd = open("/home/cfg/sniffer_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
 	i_ln_len = sprintf(puc_ln_buf, "0");
 	i_size_fd = write(fd, puc_ln_buf, i_ln_len);
@@ -169,11 +176,8 @@ int main(int argc, char** argv)
 
 	printf("PLCManager starting...\r\n");
 
-	_report_app_cfg();
-
-	system("killall pppd");
-	system("killall chat");
-	//system("killall node");
+	//system("killall pppd");
+	//system("killall chat");
 	sleep(2);
 
 	/* Init callbacks for applications */
@@ -184,6 +188,9 @@ int main(int argc, char** argv)
 
 	/* Init Tools module (Init GPIOs) */
 	tools_init();
+
+	/* Create cfg files to use with WebServer */
+	_report_app_cfg();
 
 	/* Open SNIFFER server socket */
 	i_socket_res =  socket_create_server(PLC_MNG_SNIFFER_APP_ID, INADDR_ANY, PLC_MNG_SNIFFER_APP_PORT);

@@ -49,6 +49,7 @@ static char spc_fu_filename[200];
 static bool sb_pending_preq_cfm;
 static bool sb_pending_cdata_cfm;
 static bool sb_pending_ifaces_cfg;
+static bool sb_request_gprs_up;
 
 /* Waiting Process timer */
 static uint32_t sul_waiting_gw_data_timer;
@@ -322,7 +323,6 @@ static void _process_adp_event(uint8_t *puc_ev_data)
 	case NET_INFO_ADP_NET_START_CFM:
 		_reset_node_list();
 		tools_plc_down();
-		tools_plc_up();
 		sb_net_start = true;
 		break;
 
@@ -419,49 +419,64 @@ static void _get_ifaces_cfg(void)
 	uint8_t uc_if_idx;
 	int family, s, n;
 	char host[50];
+	bool b_ppp0_ula, b_ppp0_lla;
 
-	/* Check Validity of gateway Data */
-	if (getifaddrs(&ifaddr) == -1) {
-		printf ("if address error\n");
-	}
+	b_ppp0_ula = false;
+	b_ppp0_lla = false;
 
-	/* Walk through linked list, maintaining head pointer so we
-	              can free list later */
-	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
-	   if (ifa->ifa_addr == NULL)
-		   continue;
+	while(!b_ppp0_ula || !b_ppp0_lla) {
+		sleep(1);
 
-	   family = ifa->ifa_addr->sa_family;
+		/* Check Validity of gateway Data */
+		if (getifaddrs(&ifaddr) == -1) {
+			printf ("if address error\n");
+		}
 
-	   if (family == AF_INET || family == AF_INET6) {
-		   if (memcmp("eth0", ifa->ifa_name, 4) == 0) {
-			   uc_if_idx = ETH0;
-		   } else if (memcmp("ppp0", ifa->ifa_name, 4) == 0) {
-			   uc_if_idx = PPP0;
-		   } else if (memcmp("zt0", ifa->ifa_name, 3) == 0) {
-			   uc_if_idx = ZT0;
-		   } else {
+		/* Walk through linked list, maintaining head pointer so we
+					  can free list later */
+		for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+		   if (ifa->ifa_addr == NULL)
 			   continue;
-		   }
 
-		   s = getnameinfo(ifa->ifa_addr,
-		   				   (family == AF_INET) ? sizeof(struct sockaddr_in) :
-		   										 sizeof(struct sockaddr_in6),
-		   				   host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+		   family = ifa->ifa_addr->sa_family;
 
-		   if (family == AF_INET) {
-			   /* IPV4 */
-			   sprintf(sx_ifaces[uc_if_idx].af_inet, "%s", host);
-		   } else {
-			   if ((host[1] == 0x65) && (host[2] == 0x38)) {
-				   /* LLA */
-				   sprintf(sx_ifaces[uc_if_idx].af_inet6_1, "%s", host);
+		   if (family == AF_INET || family == AF_INET6) {
+			   if (memcmp("eth0", ifa->ifa_name, 4) == 0) {
+				   uc_if_idx = ETH0;
+			   } else if (memcmp("ppp0", ifa->ifa_name, 4) == 0) {
+				   uc_if_idx = PPP0;
+			   } else if (memcmp("zt0", ifa->ifa_name, 3) == 0) {
+				   uc_if_idx = ZT0;
 			   } else {
-				   /* ULA */
-				   sprintf(sx_ifaces[uc_if_idx].af_inet6_2, "%s", host);
+				   continue;
+			   }
+
+			   s = getnameinfo(ifa->ifa_addr,
+							   (family == AF_INET) ? sizeof(struct sockaddr_in) :
+													 sizeof(struct sockaddr_in6),
+							   host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+			   if (family == AF_INET) {
+				   /* IPV4 */
+				   sprintf(sx_ifaces[uc_if_idx].af_inet, "%s", host);
+			   } else {
+				   if ((host[1] == 0x65) && (host[2] == 0x38)) {
+					   /* LLA */
+					   sprintf(sx_ifaces[uc_if_idx].af_inet6_1, "%s", host);
+					   if (uc_if_idx == PPP0) {
+						   b_ppp0_lla = true;
+					   }
+				   } else {
+					   /* ULA */
+					   sprintf(sx_ifaces[uc_if_idx].af_inet6_2, "%s", host);
+					   if (uc_if_idx == PPP0) {
+						   b_ppp0_ula = true;
+					   }
+				   }
 			   }
 		   }
-	   }
+		}
+
 	}
 
 	freeifaddrs(ifaddr);
@@ -524,13 +539,10 @@ void net_info_mng_process(void)
 
 	/* Check PPP0 interface is enable */
 	if (tools_plc_check() == -1) {
-			tools_plc_reset();
-			system("killall pppd");
-			system("killall chat");
-			sleep(2);
-			printf ("ppp0 not exist\n");
-			/* It file doesn't exists, PPP0 iface should be restarted */
-			tools_plc_up();
+		sb_pending_ifaces_cfg = true;
+		tools_plc_down();
+		tools_plc_up();
+		return;
 	}
 
 	/* Check Validity of gateway Data */
@@ -548,6 +560,10 @@ void net_info_mng_process(void)
 		_get_ifaces_cfg();
 		_report_ifaces_cfg();
 		sb_pending_ifaces_cfg = false;
+
+		/* gprs enable */
+		//tools_gprs_up();
+		tools_gprs_enable();
 	}
 
 	/* Check Web Command pending to send Command to Node JS */
@@ -570,7 +586,6 @@ void net_info_mng_init(int _app_id)
 
 	sb_net_start = false;
 
-	tools_plc_down();
 	tools_plc_reset();
 	_reset_node_list();
 
@@ -582,6 +597,7 @@ void net_info_mng_init(int _app_id)
 	sb_pending_preq_cfm = false;
 	sb_pending_cdata_cfm = false;
 	sb_pending_ifaces_cfg = true;
+	sb_request_gprs_up = false;
 	sul_waiting_gw_data_timer = 0;
 
 	suc_webcmd_pending = WEBCMD_INVALD;
@@ -603,54 +619,54 @@ void net_info_webcmd_process(uint8_t* buf)
 		}
     	break;
 
-    case WEBCMD_ENABLE_GPRS_MOD:
-		{
-			bool b_up;
-			char puc_ln_buf[50];
-			int i_ln_len, i_size_fd;
-			int fd;
-
-			LOG_NET_INFO_DEBUG(("Net Info manager: enable GPRS module\n"));
-			b_up = false;
-			tools_gprs_enable();
-			if (tools_gprs_detect()) {
-				tools_gprs_up();
-				if (tools_gprs_check()) {
-					b_up = true;
-				}
-			}
-
-			fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
-			if (b_up) {
-				i_ln_len = sprintf(puc_ln_buf, "1");
-			} else {
-				i_ln_len = sprintf(puc_ln_buf, "0");
-			}
-			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
-			close(fd);
-
-			suc_webcmd_pending = LNXCMD_REFRESH_GPRS;
-		}
-    	break;
-
-    case WEBCMD_DISABLE_GPRS_MOD:
-		{
-			char puc_ln_buf[50];
-			int i_ln_len, i_size_fd;
-			int fd;
-
-			LOG_NET_INFO_DEBUG(("Net Info manager: disable GPRS module\n"));
-			tools_gprs_down();
-			tools_gprs_disable();
-
-			i_ln_len = sprintf(puc_ln_buf, "0");
-			fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
-			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
-			close(fd);
-
-			suc_webcmd_pending = LNXCMD_REFRESH_GPRS;
-		}
-    	break;
+//    case WEBCMD_ENABLE_GPRS_MOD:
+//		{
+//			bool b_up;
+//			char puc_ln_buf[50];
+//			int i_ln_len, i_size_fd;
+//			int fd;
+//
+//			LOG_NET_INFO_DEBUG(("Net Info manager: enable GPRS module\n"));
+//			b_up = false;
+//			tools_gprs_enable();
+//			if (tools_gprs_detect()) {
+//				tools_gprs_up();
+//				if (tools_gprs_check()) {
+//					b_up = true;
+//				}
+//			}
+//
+//			fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+//			if (b_up) {
+//				i_ln_len = sprintf(puc_ln_buf, "1");
+//			} else {
+//				i_ln_len = sprintf(puc_ln_buf, "0");
+//			}
+//			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+//			close(fd);
+//
+//			suc_webcmd_pending = LNXCMD_REFRESH_GPRS;
+//		}
+//    	break;
+//
+//    case WEBCMD_DISABLE_GPRS_MOD:
+//		{
+//			char puc_ln_buf[50];
+//			int i_ln_len, i_size_fd;
+//			int fd;
+//
+//			LOG_NET_INFO_DEBUG(("Net Info manager: disable GPRS module\n"));
+//			tools_gprs_down();
+//			tools_gprs_disable();
+//
+//			i_ln_len = sprintf(puc_ln_buf, "0");
+//			fd = open("/home/cfg/gprs_en", O_RDWR|O_CREAT, S_IROTH|S_IWOTH|S_IXOTH);
+//			i_size_fd = write(fd, puc_ln_buf, i_ln_len);
+//			close(fd);
+//
+//			suc_webcmd_pending = LNXCMD_REFRESH_GPRS;
+//		}
+//    	break;
 
     case WEBCMD_ENABLE_SNIFFER_MOD:
 		{

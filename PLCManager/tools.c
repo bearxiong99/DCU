@@ -18,8 +18,10 @@ static char syscmd_plc_down[] =  "/etc/init.d/PLCpppUp stop";
 static char syscmd_plc_up[] =  "/etc/init.d/PLCpppUp start";
 static char spuc_plc_iface_file[] = "/sys/class/net/ppp0/statistics/rx_packets";
 
-static char syscmd_gprs_down[] =  "/etc/init.d/GPRSpppUp stop";
-static char syscmd_gprs_up[] =  "/etc/init.d/GPRSpppUp start";
+//static char syscmd_gprs_down[] =  "/etc/init.d/GPRSpppUp stop";
+static char syscmd_gprs_down[] =  "poff gprs";
+//static char syscmd_gprs_up[] =  "/etc/init.d/GPRSpppUp start";
+static char syscmd_gprs_up[] =  "pon gprs";
 static char spuc_gprs_iface_file[] = "/sys/class/net/ppp1/statistics/rx_packets";
 
 static const char spuc_fu_start_cmd[] =  "/home/cfg/fu_en";
@@ -112,15 +114,25 @@ void tools_plc_down(void)
 
 	res = system(syscmd_plc_down);
 	printf("plc iface down res: %u\r\n", res);
-	sleep(2);
+	sleep(5);
 }
 
 void tools_plc_up(void)
 {
 	int res;
+	int cnt;
 
 	res = system(syscmd_plc_up);
 	printf("plc iface up res: %u\r\n", res);
+
+	cnt = 0;
+	while(tools_plc_check() == -1) {
+		sleep(2);
+		if (cnt++ == 30) {
+			return;
+		}
+	}
+
 	sleep(5);
 }
 
@@ -138,9 +150,12 @@ int tools_plc_check(void)
 
 void tools_gprs_enable(void)
 {
+	/* Disable supply */
+	GPIOWrite(GPRS_SUPPLY_GPIO_ID, GPRS_SUPPLY_GPIO_DISABLE);
+	sleep(1);
 	/* Provide supply */
 	GPIOWrite(GPRS_SUPPLY_GPIO_ID, GPRS_SUPPLY_GPIO_ENABLE);
-	sleep(1);
+	sleep(2);
 
 	/* Reset */
 	GPIOWrite(GPRS_PWRKEY_GPIO_ID, GPRS_DETECT_GPIO_ENABLE);
@@ -178,7 +193,7 @@ void tools_gprs_down(void)
 
 	res = system(syscmd_gprs_down);
 	printf("gprs iface down res: %u\r\n", res);
-	sleep(2);
+	sleep(5);
 }
 
 void tools_gprs_up(void)
@@ -187,7 +202,6 @@ void tools_gprs_up(void)
 
 	res = system(syscmd_gprs_up);
 	printf("gprs iface up res: %u\r\n", res);
-	sleep(5);
 }
 
 int tools_gprs_check(void)
